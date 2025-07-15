@@ -23,7 +23,7 @@ function Get-PhpSrc {
 
         if ($PhpVersion.Contains(".")) {
             $ref = "php-$PhpVersion"
-            $url = "$baseUrl/php-$PhpVersion.zip"
+            $url = "$baseUrl/$zipFile"
         } else {
             $ref = $PhpVersion
             $url = "$baseUrl/$PhpVersion.zip"
