@@ -17,7 +17,7 @@ function Get-PhpSrc {
     process {
         Add-Type -Assembly "System.IO.Compression.Filesystem"
 
-        $baseUrl = "https://ospanel.io"
+        $baseUrl = "https://files.ospanel.io"
         $zipFile = "php-$PhpVersion.zip"
         $directory = "php-$PhpVersion-src"
 
