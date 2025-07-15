@@ -17,13 +17,13 @@ function Get-PhpSrc {
     process {
         Add-Type -Assembly "System.IO.Compression.Filesystem"
 
-        $baseUrl = "https://github.com/php/php-src/archive"
+        $baseUrl = "https://ospanel.io"
         $zipFile = "php-$PhpVersion.zip"
         $directory = "php-$PhpVersion-src"
 
         if ($PhpVersion.Contains(".")) {
             $ref = "php-$PhpVersion"
-            $url = "$baseUrl/refs/tags/php-$PhpVersion.zip"
+            $url = "$baseUrl/php-$PhpVersion.zip"
         } else {
             $ref = $PhpVersion
             $url = "$baseUrl/$PhpVersion.zip"
