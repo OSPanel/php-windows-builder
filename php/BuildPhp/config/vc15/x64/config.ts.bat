@@ -1,1 +1,1 @@
-cscript /nologo configure.js "--enable-snapshot-build" "--enable-debug-pack" "--enable-object-out-dir=../obj/" "--enable-com-dotnet=shared" "--with-oci8=..\oracle\instantclient_10_2" "--with-pdo-oci=..\oracle\instantclient_10_2" "--without-analyzer" "--enable-pgi" %*
+cscript /nologo configure.js "--enable-snapshot-build" "--enable-debug-pack" "--enable-object-out-dir=../obj/" "--enable-com-dotnet=shared" "--without-analyzer" "--enable-pgi" %*
