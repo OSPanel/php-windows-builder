@@ -30,6 +30,8 @@ jobs:
           php-version: ${{ github.event.inputs.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
+        env:
+          ORACLE_HOME_10G: "C:\\oracle\\instantclient_10_2"
 
   artifacts:
     runs-on: ubuntu-latest
