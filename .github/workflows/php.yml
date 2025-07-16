@@ -32,7 +32,7 @@ jobs:
           ts: ${{ matrix.ts }}
         env:
           ORACLE_HOME_10G: "C:\\oracle\\instantclient_10_2"
-          PATH: "C:\\oracle\\instantclient_10_2;${{ env.PATH }}"
+          PATH: "C:\\oracle\\instantclient_10_2;$env:PATH"
 
   artifacts:
     runs-on: ubuntu-latest
