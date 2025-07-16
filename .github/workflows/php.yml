@@ -24,15 +24,18 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Setup Oracle Instant Client
+        run: |
+          echo "C:\oracle\instantclient_10_2" >> $GITHUB_PATH
+          echo "ORACLE_HOME_10G=C:\oracle\instantclient_10_2" >> $GITHUB_ENV
+        shell: bash
+
       - name: Build
         uses: ./php
         with:
           php-version: ${{ github.event.inputs.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
-        env:
-          ORACLE_HOME_10G: "C:\\oracle\\instantclient_10_2"
-          PATH: "C:\\oracle\\instantclient_10_2;$env:PATH"
 
   artifacts:
     runs-on: ubuntu-latest
