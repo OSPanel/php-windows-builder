@@ -1,0 +1,16 @@
+SDK Package Information 
+======================= 
+Wed Mar  8 07:36:18 CST 2017
+Client Shared Library 64-bit - 12.2.0.1.0
+
+Windows NT Version V6.2  
+ORACLE_HOME =  C:\ADE\aime_529333\oracle
+Node name           : ADC01IZQ
+CPU                 : 4 - type 8664, 4 Physical Cores
+Process Affinity    : 0x0x0000000000000000
+Memory (Avail/Total): Ph:10768M/16383M, Ph+PgF:13182M/1881
+Operating in ORACLE_HOME environment.
+
+Small timezone file = timezone_26.dat
+Large timezone file = timezlrg_26.dat
+

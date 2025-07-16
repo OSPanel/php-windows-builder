@@ -1,0 +1,18 @@
+SDK Package Information 
+======================= 
+Tue Jan 28 23:26:21 PST 2025
+Client Shared Library 64-bit - 19.26.0.0.0
+
+Windows NT Version V6.2  
+CPU                 : 4 - type 86642 physical cores
+Process Affinity    : 0x0000000000000000
+Memory (Avail/Total): Ph:29295M/32767M, Ph+PgF:33845M/37631M 
+
+
+TIMEZONE INFORMATION
+--------------------
+Operating in ORACLE_HOME environment.
+
+Small timezone file = timezone_32.dat
+Large timezone file = timezlrg_32.dat
+
