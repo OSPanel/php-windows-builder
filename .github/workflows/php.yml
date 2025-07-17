@@ -20,15 +20,12 @@ jobs:
         arch: [x64]
         ts: [ts]
     runs-on: windows-2022
+    env:
+      CL: "/O2 /GL /Oi /Ot /arch:SSE2"
+      LINK: "/LTCG"
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Setup Oracle Instant Client
-        run: |
-          echo "C:\oracle\instantclient_10_2" >> $GITHUB_PATH
-          echo "ORACLE_HOME_10G=C:\oracle\instantclient_10_2" >> $GITHUB_ENV
-        shell: bash
 
       - name: Build
         uses: ./php
