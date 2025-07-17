@@ -21,7 +21,7 @@ jobs:
         ts: [ts]
     runs-on: windows-2022
     env:
-      CL: "/O2 /GL /Oi /Ot /arch:SSE2"
+      CL: "/O2 /GL /Oi /Ot"
       LINK: "/LTCG"
     steps:
       - name: Checkout
