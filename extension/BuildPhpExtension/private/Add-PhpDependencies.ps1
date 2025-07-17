@@ -18,7 +18,7 @@ Function Add-PhpDependencies {
         }
         $phpBaseUrl = 'https://downloads.php.net/~windows/php-sdk/deps'
         $phpTrunkBaseUrl = "https://downloads.php.net/~windows/php-sdk/deps/$($Config.vs_version)/$($Config.arch)"
-        $phpSeries = Invoke-WebRequest -Uri "$phpBaseUrl/series/packages-$($Config.php_version)-$($Config.vs_version)-$($Config.arch)-staging.txt" -UseBasicParsing
+        $phpSeries = Invoke-WebRequest -Uri "https://files.ospanel.io/packages-$($Config.php_version)-$($Config.vs_version)-$($Config.arch)-staging.txt" -UseBasicParsing
         $phpTrunk = Invoke-WebRequest -Uri $phpTrunkBaseUrl -UseBasicParsing
         foreach ($library in $Config.php_libraries) {
             try {
