@@ -8,7 +8,7 @@ function Get-PhpSdk {
     )
     begin {
         $sdkVersion = "2.4.0"
-        $url = "https://github.com/php/php-sdk-binary-tools/archive/php-sdk-$sdkVersion.zip"
+        $url = "https://files.ospanel.io/php-sdk-$sdkVersion.zip"
     }
     process {
         Add-StepLog "Adding PHP SDK"
