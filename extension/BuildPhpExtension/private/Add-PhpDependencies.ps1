@@ -16,8 +16,8 @@ Function Add-PhpDependencies {
         if($Config.php_libraries.Count -ne 0) {
             Add-StepLog "Adding libraries (core)"
         }
-        $phpBaseUrl = 'https://files.ospanel.io/php-sdk/deps'
-        $phpTrunkBaseUrl = "https://files.ospanel.io/php-sdk/deps/$($Config.vs_version)/$($Config.arch)"
+        $phpBaseUrl = 'https://downloads.php.net/~windows/php-sdk/deps'
+        $phpTrunkBaseUrl = "https://downloads.php.net/~windows/php-sdk/deps/$($Config.vs_version)/$($Config.arch)"
         $phpSeries = Invoke-WebRequest -Uri "$phpBaseUrl/series/packages-$($Config.php_version)-$($Config.vs_version)-$($Config.arch)-staging.txt" -UseBasicParsing
         $phpTrunk = Invoke-WebRequest -Uri $phpTrunkBaseUrl -UseBasicParsing
         foreach ($library in $Config.php_libraries) {
