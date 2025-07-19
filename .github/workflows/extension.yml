@@ -48,7 +48,7 @@ on:
         default: 'off'
 jobs:
   get-extension-matrix:
-    runs-on: ubuntu-latest
+    runs-on: LINUX-PC
     outputs:
       matrix: ${{ steps.extension-matrix.outputs.matrix }}
     steps:
@@ -89,7 +89,7 @@ jobs:
           build-directory: C:\build
 
   artifacts:
-    runs-on: ubuntu-latest
+    runs-on: LINUX-PC
     needs: extension
     steps:
       - name: Upload artifacts
