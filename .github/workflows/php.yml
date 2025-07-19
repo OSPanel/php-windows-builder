@@ -19,7 +19,7 @@ jobs:
       matrix:
         arch: [x64]
         ts: [ts]
-    runs-on: windows-2022
+    runs-on: USER-PC
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,7 +32,7 @@ jobs:
           ts: ${{ matrix.ts }}
 
   artifacts:
-    runs-on: ubuntu-latest
+    runs-on: LINUX-PC
     needs: php
     outputs:
       artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
@@ -44,7 +44,7 @@ jobs:
           name: artifacts
           delete-merged: true
   upload:
-    runs-on: ubuntu-latest
+    runs-on: LINUX-PC
     needs: artifacts
     if: ${{ github.event.inputs.upload == 'true' }}
     steps:
