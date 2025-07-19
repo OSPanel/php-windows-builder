@@ -1,0 +1,218 @@
+name: Build PHP Extension From PECL
+run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
+on:
+  workflow_dispatch:
+    inputs:
+      extension-url:
+        description: 'Extension URL'
+        required: true
+      extension-ref:
+        description: 'Extension ref'
+        required: true
+      php-version-list:
+        description: 'PHP versions to build'
+        required: false
+      arch-list:
+        type: choice
+        options: ['x64', 'x86', 'x64,x86']
+        description: 'Architectures to build'
+        required: false
+        default: 'x64,x86'
+      ts-list:
+        type: choice
+        options: ['nts', 'ts', 'nts,ts']
+        description: 'Thread safety to build'
+        required: false
+        default: 'nts,ts'
+      args:
+        description: 'Configure arguments'
+        required: false
+      libs:
+        description: 'Libraries'
+        required: false
+      run-tests:
+        type: choice
+        options: ['true', 'false']
+        description: 'Run tests after building the extension'
+        required: false
+        default: 'false'
+      test-runner:
+        description: 'Test runner to use'
+        required: false
+        default: 'run-tests.php'
+
+jobs:
+  get-extension-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.extension-matrix.outputs.matrix }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Кешируем checkout для этого job
+          persist-credentials: false
+      
+      - name: Cache repository
+        uses: actions/cache@v4
+        with:
+          path: .
+          key: repo-cache-${{ github.sha }}
+          restore-keys: |
+            repo-cache-
+      
+      - name: Get the extension matrix
+        id: extension-matrix
+        uses: ./extension-matrix
+        with:
+          extension-url: ${{ inputs.extension-url }}
+          extension-ref: ${{ inputs.extension-ref }}
+          php-version-list: ${{ inputs.php-version-list }}
+          arch-list: ${{ inputs.arch-list }}
+          ts-list: ${{ inputs.ts-list }}
+
+  extension:
+    needs: get-extension-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{fromJson(needs.get-extension-matrix.outputs.matrix)}}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      
+      # Кеш для репозитория
+      - name: Cache repository
+        uses: actions/cache@v4
+        with:
+          path: .
+          key: repo-cache-${{ github.sha }}
+          restore-keys: |
+            repo-cache-
+      
+      # Кеш для Windows SDK и инструментов сборки
+      - name: Cache Windows build tools
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\Program Files (x86)\Microsoft Visual Studio\
+            C:\Program Files (x86)\Windows Kits\
+            C:\ProgramData\chocolatey\
+          key: windows-build-tools-${{ runner.os }}-${{ hashFiles('**/package.json', '**/composer.json') }}
+          restore-keys: |
+            windows-build-tools-${{ runner.os }}-
+      
+      # Кеш для PHP SDK и библиотек
+      - name: Cache PHP SDK
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            C:\php-sdk\
+            C:\deps\
+            C:\build\
+          key: php-sdk-${{ matrix.php-version }}-${{ matrix.arch }}-${{ matrix.ts }}-${{ hashFiles('**/config.w32') }}
+          restore-keys: |
+            php-sdk-${{ matrix.php-version }}-${{ matrix.arch }}-${{ matrix.ts }}-
+            php-sdk-${{ matrix.php-version }}-${{ matrix.arch }}-
+            php-sdk-${{ matrix.php-version }}-
+      
+      # Кеш для скачанных исходников расширения
+      - name: Cache extension source
+        uses: actions/cache@v4
+        with:
+          path: |
+            extension-src/
+            ~/.cache/
+          key: extension-src-${{ inputs.extension-url }}-${{ inputs.extension-ref }}-${{ hashFiles('**/config.m4', '**/config.w32') }}
+          restore-keys: |
+            extension-src-${{ inputs.extension-url }}-${{ inputs.extension-ref }}-
+            extension-src-${{ inputs.extension-url }}-
+      
+      - name: Build the extension
+        uses: ./extension
+        with:
+          extension-url: ${{ inputs.extension-url }}
+          extension-ref: ${{ inputs.extension-ref }}
+          php-version: ${{ matrix.php-version }}
+          arch: ${{ matrix.arch }}
+          ts: ${{ matrix.ts }}
+          args: ${{ inputs.args }}
+          libs: ${{ inputs.libs }}
+          run-tests: ${{ inputs.run-tests }}
+          test-runner: ${{ inputs.test-runner }}
+          build-directory: C:\build
+        env:
+          artifact-naming-scheme: pecl
+          auto-detect-args: true
+          auto-detect-libs: true
+          no-debug-symbols-ddtrace: true
+
+  artifacts:
+    runs-on: ubuntu-latest
+    needs: extension
+    steps:
+      # Кеш для Ubuntu тоже добавляем
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: apt-cache-${{ runner.os }}-${{ hashFiles('**/Dockerfile', '**/requirements.txt') }}
+          restore-keys: |
+            apt-cache-${{ runner.os }}-
+      
+      - name: Upload artifacts
+        uses: actions/upload-artifact/merge@v4
+        with:
+          name: artifacts
+          delete-merged: true
+
+  pecl-release:
+    runs-on: ubuntu-latest
+    needs: artifacts
+    steps:
+      # Кеш для скачанных артефактов
+      - name: Cache downloaded artifacts
+        uses: actions/cache@v4
+        with:
+          path: artifacts/
+          key: artifacts-cache-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            artifacts-cache-${{ github.run_id }}-
+      
+      - name: Get artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: artifacts
+          path: artifacts
+      
+      - name: Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          ls -l artifacts
+          extension=$(basename "${{ inputs.extension-url }}")
+          mkdir -p /tmp/$extension/${{ inputs.extension-ref }}/
+          cp -a artifacts/* /tmp/$extension/${{ inputs.extension-ref }}/
+          cd /tmp || exit 1
+          zip -r $extension-${{ inputs.extension-ref }}.zip $extension
+          if ! gh release view pecl -R ${{ github.repository }}; then
+            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t pecl -n pecl -R ${{ github.repository }}
+          else
+            gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
+          fi
+
+  upload:
+    runs-on: ubuntu-latest
+    needs: pecl-release
+    steps:
+      - name: Upload to downloads server
+        run: |
+          extension=$(basename "${{ inputs.extension-url }}")
+          url="https://github.com/${{ github.repository }}/releases/download/pecl/$extension-${{ inputs.extension-ref }}.zip"
+          gh workflow run pecl.yml -R php/web-downloads -f url="$url" -f extension="$extension" -f ref="${{ inputs.extension-ref }}"
+        env:
+          GITHUB_TOKEN: ${{ secrets.WINDOWS_BUILDS_TOKEN }}
