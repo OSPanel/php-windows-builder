@@ -19,7 +19,7 @@ jobs:
       matrix:
         arch: [x64]
         ts: [ts]
-    runs-on: self-hosted
+    runs-on: windows-2022
     steps:
       - name: Checkout
         uses: actions/checkout@v4
