@@ -42,7 +42,7 @@ on:
         default: 'run-tests.php'
 jobs:
   get-extension-matrix:
-    runs-on: LINUX-PC
+    runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.extension-matrix.outputs.matrix }}
     steps:
@@ -87,7 +87,7 @@ jobs:
           no-debug-symbols-ddtrace: true
 
   artifacts:
-    runs-on: LINUX-PC
+    runs-on: ubuntu-latest
     needs: extension
     steps:
       - name: Upload artifacts
@@ -97,7 +97,7 @@ jobs:
           delete-merged: true
 
   pecl-release:
-    runs-on: LINUX-PC
+    runs-on: ubuntu-latest
     needs: artifacts
     steps:
       - name: Get artifact
@@ -121,7 +121,7 @@ jobs:
             gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
           fi
   upload:
-    runs-on: LINUX-PC
+    runs-on: ubuntu-latest
     needs: pecl-release
     steps:
       - name: Upload to downloads server
