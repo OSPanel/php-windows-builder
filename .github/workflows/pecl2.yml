@@ -1,5 +1,5 @@
-name: Build PHP Extension From PECL
-run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
+name: Build2 PHP Extension From PECL
+run-name: Build2 PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
 on:
   workflow_dispatch:
     inputs:
