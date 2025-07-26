@@ -14,10 +14,10 @@ on:
         required: false
       arch-list:
         type: choice
-        options: ['x64', 'x86', 'x64,x86']
+        options: ['x64']
         description: 'Architectures to build'
         required: false
-        default: 'x64,x86'
+        default: 'x64'
       ts-list:
         type: choice
         options: ['nts', 'ts', 'nts,ts']
@@ -99,39 +99,3 @@ jobs:
         with:
           name: artifacts
           delete-merged: true
-
-  pecl-release:
-    runs-on: ubuntu-latest
-    needs: artifacts
-    steps:
-      - name: Get artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts
-          path: artifacts
-      - name: Release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          ls -l artifacts
-          extension=$(basename "${{ inputs.extension-url }}")
-          mkdir -p /tmp/$extension/${{ inputs.extension-ref }}/
-          cp -a artifacts/* /tmp/$extension/${{ inputs.extension-ref }}/
-          cd /tmp || exit 1
-          zip -r $extension-${{ inputs.extension-ref }}.zip $extension
-          if ! gh release view pecl -R ${{ github.repository }}; then
-            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t pecl -n pecl -R ${{ github.repository }}
-          else
-            gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
-          fi
-  upload:
-    runs-on: ubuntu-latest
-    needs: pecl-release
-    steps:
-      - name: Upload to downloads server
-        run: |
-          extension=$(basename "${{ inputs.extension-url }}")
-          url="https://github.com/${{ github.repository }}/releases/download/pecl/$extension-${{ inputs.extension-ref }}.zip"
-          gh workflow run pecl.yml -R php/web-downloads -f url="$url" -f extension="$extension" -f ref="${{ inputs.extension-ref }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.WINDOWS_BUILDS_TOKEN }}
