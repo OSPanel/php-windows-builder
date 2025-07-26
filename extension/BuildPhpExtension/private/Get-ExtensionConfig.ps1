@@ -67,8 +67,8 @@ Function Get-ExtensionConfig {
             if($Extension.Contains("oci8")) {
                 $packageName = "oci8"
             }
-            if($Extension.Contains("ddtrace")) {
-                $packageName = "datadog_trace"
+            if($Extension.Contains("datadog_trace")) {
+                $packageName = "ddtrace"
             }
             $config = [PSCustomObject]@{
                 name = $Extension
