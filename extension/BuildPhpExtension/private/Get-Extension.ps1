@@ -103,7 +103,7 @@ function Get-Extension {
                      $patches = $True
             }
 
-            $configW32 = Get-ChildItem (Get-Location).Path -Recurse -Filter "config.w32" -ErrorAction SilentlyContinue
+            $configW32 = Get-ChildItem (Get-Location).Path -Recurse -Filter "config.w32" -ErrorAction SilentlyContinue | Select-Object -First 1
             if($null -eq $configW32) {
                 throw "No config.w32 found"
             }
