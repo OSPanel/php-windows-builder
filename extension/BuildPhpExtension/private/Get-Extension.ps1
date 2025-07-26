@@ -103,14 +103,9 @@ function Get-Extension {
                      $patches = $True
             }
 
-            $configW32 = Get-ChildItem (Get-Location).Path -Recurse -Filter "config.w32" -ErrorAction SilentlyContinue | Select-Object -First 1
+            $configW32 = Get-ChildItem (Get-Location).Path -Filter "config.w32" -ErrorAction SilentlyContinue
             if($null -eq $configW32) {
                 throw "No config.w32 found"
-            }
-            $subDirectory = $configW32.DirectoryName
-            if((Get-Location).Path -ne $subDirectory) {
-                Copy-Item -Path "${subDirectory}\*" -Destination $currentDirectory -Recurse -Force
-                Remove-Item -Path $subDirectory -Recurse -Force
             }
             $configW32Content = Get-Content -Path "config.w32"
             $extensionLine =  $configW32Content | Select-String -Pattern '\s+(ZEND_)?EXTENSION\(' | Select-Object -Last 1
