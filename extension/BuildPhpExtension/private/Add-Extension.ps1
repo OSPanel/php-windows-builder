@@ -24,9 +24,11 @@ Function Add-Extension {
         Set-GAGroup start
         Invoke-WebRequest -Uri "https://pecl.php.net/get/$Extension" -OutFile "$Extension.tgz"
 
-        $cur_Extension = $Extension       
+        $cur_Extension = $Extension
+        $cur_Ref = ""
         if ($Extension -match '^(.*?)-') {
             $cur_Extension = $matches[1]
+            $cur_Ref = $matches[2]
         }        
         $currentDirectory = (Get-Location).Path
         if (-not (Test-Path "$currentDirectory\$cur_Extension")) {
@@ -39,6 +41,9 @@ Function Add-Extension {
         if($null -ne $env:GITHUB_REPOSITORY) {
                 if(Test-Path -PATH $PSScriptRoot\..\patches\$cur_Extension.ps1) {
                     . $PSScriptRoot\..\patches\$cur_Extension.ps1
+                }
+                if(Test-Path -PATH $PSScriptRoot\..\patches\$cur_Extension-$cur_Ref.ps1) {
+                    . $PSScriptRoot\..\patches\$cur_Extension-$cur_Ref.ps1
                 }
         }
         $configW32Content = [string](Get-Content -Path "config.w32")
