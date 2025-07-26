@@ -36,9 +36,11 @@ Function Add-Extension {
         Move-Item -Path "$currentDirectory\$cur_Extension\$Extension\*" -Destination "$currentDirectory\$cur_Extension" -Force        
         Set-Location "$cur_Extension"
         $extensionBuildDirectory = Join-Path -Path (Get-Location).Path -ChildPath $config.build_directory
+        if($null -ne $env:GITHUB_REPOSITORY) {
                 if(Test-Path -PATH $PSScriptRoot\..\patches\$cur_Extension.ps1) {
                     . $PSScriptRoot\..\patches\$cur_Extension.ps1
                 }
+        }
         $configW32Content = [string](Get-Content -Path "config.w32")
         $argument = Get-ArgumentFromConfig $cur_Extension $configW32Content
         $bat_content = @()
