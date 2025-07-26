@@ -16,8 +16,10 @@ Function Invoke-Build {
         Add-StepLog "Building $($Config.name) extension"
         try {
             Set-GAGroup start
-
-            $builder = "php-sdk\phpsdk-starter.bat"
+            $currentDirectory = (Get-Location).Path
+            $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Config.name
+            Set-Location -Path $extensionPath
+            $builder = "..\php-sdk\phpsdk-starter.bat"
             $task = [System.IO.Path]::Combine($PSScriptRoot, '..\config\task.bat')
 
             $options = $Config.options
