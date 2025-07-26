@@ -29,6 +29,10 @@ function Get-Extension {
                     $extension = Split-Path -Path $ExtensionUrl -Leaf
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
 
+            if($Extension.Contains("datadog_trace")) {
+               $extensionPath = Join-Path -Path $currentDirectory -ChildPath "ddtrace"
+            }
+
                     if (-not (Test-Path $extensionPath)) {
                         New-Item -Path $extensionPath -ItemType Directory | Out-Null
                     }
@@ -59,6 +63,10 @@ function Get-Extension {
                     git checkout FETCH_HEAD > $null 2>&1
                     # git submodule update --init --recursive > $null 2>&1
                 }
+            }
+
+            if($Extension.Contains("datadog_trace")) {
+                $Extension = "ddtrace"
             }
 
             & {
