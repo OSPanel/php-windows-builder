@@ -49,7 +49,9 @@ function Invoke-PhpBuild {
         Move-Item "$buildDirectory\php-$PhpVersion-src" $buildPath
         Set-Location "$buildPath"
         New-Item "..\obj" -ItemType "directory" > $null 2>&1
-        Copy-Item "..\config.$Ts.bat"
+        
+        $MajorMinor = ($PhpVersion -replace '^(\d+\.\d+).*', '$1')       
+        Copy-Item "..\$MajorMinor\config.$Ts.bat"
 
         $task = "$PSScriptRoot\..\runner\task-$Ts.bat"
 
