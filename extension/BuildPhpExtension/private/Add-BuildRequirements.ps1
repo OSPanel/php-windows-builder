@@ -52,6 +52,7 @@ function Add-BuildRequirements {
     }
     process {
         Get-PhpSdk
+        Set-Location "$Extension"
         $config = Get-ExtensionConfig -Extension $Extension `
                                       -ExtensionRef $ExtensionRef `
                                       -PhpVersion $PhpVersion `
@@ -59,6 +60,7 @@ function Add-BuildRequirements {
                                       -Ts $Ts `
                                       -VsVersion $VsVersion `
                                       -VsToolset $VsToolset
+        Set-Location ..          
         $buildDetails = Get-PhpBuildDetails -Config $Config
         $prefix = Get-PhpBuild -Config $config -BuildDetails $buildDetails
         Get-PhpDevelBuild -Config $config -BuildDetails $buildDetails
