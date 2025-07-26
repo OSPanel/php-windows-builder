@@ -1,0 +1,13 @@
+{
+    "require":
+    {
+        "ext-phpc": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "with-crypto"
+        }]
+    }
+}
