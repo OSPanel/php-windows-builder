@@ -1,8 +1,4 @@
 {
-    "require":
-    {
-        "ext-phpc": "*"
-    },
     "php-ext":
     {
         "configure-options": [
