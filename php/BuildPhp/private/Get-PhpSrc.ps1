@@ -37,6 +37,24 @@ function Get-PhpSrc {
         Invoke-WebRequest $url -Outfile $zipFile
         [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFilePath, $currentDirectory)
         Rename-Item -Path "php-src-$ref" -NewName $directory
+
+        if ($PhpVersion -like "7.2*") {
+            $repositoryInfo = $env:GITHUB_REPOSITORY -split '/'
+            $owner = $repositoryInfo[0]
+            $repository = $repositoryInfo[1]
+            $gref = $env:GITHUB_REF
+            $branch = $gref -replace 'refs/heads/', ''
+            $mkdistUrl = "https://raw.githubusercontent.com/$owner/$repository/refs/heads/$branch/resources/mkdist.php"
+            $mkdistDestinationDir = Join-Path $directoryPath "win32\build"
+            $mkdistFilePath = Join-Path $mkdistDestinationDir "mkdist.php"
+
+            if (-not (Test-Path $mkdistDestinationDir)) {
+                New-Item -ItemType Directory -Path $mkdistDestinationDir -Force | Out-Null
+            }
+
+            Invoke-WebRequest $mkdistUrl -OutFile $mkdistFilePath
+        }
+
         [System.IO.Compression.ZipFile]::CreateFromDirectory($directoryPath,  $srcZipFilePath)
     }
     end {
