@@ -52,7 +52,9 @@ function Invoke-PhpBuildExtension {
         $source = Get-ExtensionSource -ExtensionUrl $ExtensionUrl -ExtensionRef $ExtensionRef
 
         $extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref
-
+          
+        Set-Location "$buildDirectory"
+        
         $config = Add-BuildRequirements -Extension $extension `
                                         -ExtensionRef $source.ref `
                                         -PhpVersion $PhpVersion `
@@ -60,9 +62,15 @@ function Invoke-PhpBuildExtension {
                                         -Ts $Ts `
                                         -VsVersion $VsData.vs `
                                         -VsToolset $VsData.toolset
-
+                                        
+        Set-Location "$buildDirectory"
+        
+        if (Test-Path '..\deps') { New-Item -ItemType Directory -Path 'deps' -Force | Out-Null; Copy-Item '..\deps\*' -Destination 'deps' -Recurse -Force }
+        
+        $config = @($config) | Where-Object { $_.GetType().FullName -eq 'System.Management.Automation.PSCustomObject' } | Select-Object -First 1
+        
         Invoke-Build -Config $config
-
+     
         if($env:RUN_TESTS -eq 'true') {
             Invoke-Tests -Config $config
         }
@@ -71,7 +79,7 @@ function Invoke-PhpBuildExtension {
 
         Set-Location $currentDirectory
 
-        Move-Item -Path "$buildDirectory\artifacts" -Destination "$currentDirectory" -Force
+        Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
     }
     end {
     }
