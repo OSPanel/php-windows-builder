@@ -46,7 +46,7 @@ Function Add-Extension {
         $bat_content = @()
         $bat_content += ""
         $bat_content += "call phpize 2>&1"
-        $bat_content += "call configure --with-php-build=`"..\deps`" $argument --with-mp=`"disable`" --with-prefix=$Prefix 2>&1"
+        $bat_content += "call configure --with-php-build=`"..\deps`" $argument --with-mp=`"disable`" --enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2 --with-prefix=$Prefix 2>&1"
         $bat_content += "nmake /nologo 2>&1"
         $bat_content += "exit %errorlevel%"
         Set-Content -Encoding "ASCII" -Path $cur_Extension-task.bat -Value $bat_content
