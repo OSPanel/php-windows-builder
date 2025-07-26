@@ -21,7 +21,9 @@ Function Invoke-Build {
             Set-Location -Path $extensionPath
             $builder = "..\php-sdk\phpsdk-starter.bat"
             $task = [System.IO.Path]::Combine($PSScriptRoot, '..\config\task.bat')
-
+            if($Config.php_version -eq '7.2') {
+                $task = [System.IO.Path]::Combine($PSScriptRoot, '..\config\task72.bat')
+            }
             $options = $Config.options
             if ($Config.debug_symbols) {
                 $options += " --enable-debug-pack"
