@@ -4,12 +4,5 @@
         "ext-json": "*",
         "zlib": "*",
         "pthreads": "*"
-    },
-    "php-ext":
-    {
-        "configure-options": [
-        {
-            "name": "enable-couchbase"
-        }]
     }
 }
