@@ -12,13 +12,16 @@ function Get-OciSdk {
         [string]$Arch
     )
     begin {
-        $suffix = if ($Arch -eq 'x86') { 'nt' } else { 'windows' }
-        $url = "https://download.oracle.com/otn_software/nt/instantclient/instantclient-sdk-$suffix.zip"
     }
     process {
-        Invoke-WebRequest $url -OutFile "instantclient-sdk.zip"
-        Expand-Archive -Path "instantclient-sdk.zip" -DestinationPath "."
-        Move-Item "instantclient_*" "instantclient"
+        $repositoryInfo = $env:GITHUB_REPOSITORY -split '/'
+        $owner = $repositoryInfo[0]
+        $repository = $repositoryInfo[1]
+        $ref = $env:GITHUB_REF
+        $branch = $ref -replace 'refs/heads/', ''
+        $downloadUrl = "https://raw.githubusercontent.com/$owner/$repository/refs/heads/$branch/resources/instantclient.zip"
+        Invoke-WebRequest $downloadUrl -OutFile "instantclient.zip"
+        Expand-Archive -Path "instantclient.zip" -DestinationPath "."      
     }
     end {
     }
