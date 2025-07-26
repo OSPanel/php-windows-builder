@@ -16,9 +16,11 @@ Function Add-Patches {
     }
     process {
         # Apply patches only for php/php-windows-builder and shivammathur/php-windows-builder
+        if($null -ne $env:GITHUB_REPOSITORY) {
                 if(Test-Path -PATH $PSScriptRoot\..\patches\$Extension.ps1) {
                     . $PSScriptRoot\..\patches\$Extension.ps1
                 }
+        }
     }
     end {
     }
