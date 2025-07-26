@@ -94,10 +94,8 @@ function Get-Extension {
 
             $patches = $False
             if(Test-Path -PATH $PSScriptRoot\..\patches\$extension.ps1) {
-                if((Get-Content $PSScriptRoot\..\patches\$extension.ps1).Contains('config.w32')) {
                      Add-Patches $extension
                      $patches = $True
-                }
             }
 
             $configW32 = Get-ChildItem (Get-Location).Path -Recurse -Filter "config.w32" -ErrorAction SilentlyContinue
