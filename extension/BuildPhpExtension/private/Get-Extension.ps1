@@ -27,11 +27,17 @@ function Get-Extension {
             }
                     $currentDirectory = (Get-Location).Path
                     $extension = Split-Path -Path $ExtensionUrl -Leaf
-                    $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
+                    $extension_orig = Split-Path -Path $ExtensionUrl -Leaf
 
-            if($Extension.Contains("datadog_trace")) {
-               $extensionPath = Join-Path -Path $currentDirectory -ChildPath "ddtrace"
-            }
+                    if($Extension.Contains("dd-trace-php")) {
+                        $Extension = "ddtrace"
+                    }
+
+                    if($Extension.Contains("datadog_trace")) {
+                        $Extension = "ddtrace"
+                    }
+
+                   $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
 
                     if (-not (Test-Path $extensionPath)) {
                         New-Item -Path $extensionPath -ItemType Directory | Out-Null
@@ -43,16 +49,16 @@ function Get-Extension {
             if($null -ne $ExtensionUrl -and $null -ne $ExtensionRef) {
                 if ($ExtensionUrl -like "*pecl.php.net*") {
                     try {
-                        Invoke-WebRequest -Uri "https://pecl.php.net/get/$extension-$ExtensionRef.tgz" -OutFile "$extension-$ExtensionRef.tgz" -UseBasicParsing
+                        Invoke-WebRequest -Uri "https://pecl.php.net/get/$extension_orig-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
                     } catch {}
-                    if(-not(Test-Path "$extension-$ExtensionRef.tgz")) {
+                    if(-not(Test-Path "$extension_orig-$ExtensionRef.tgz")) {
                         try {
-                            Invoke-WebRequest -Uri "https://pecl.php.net/get/$($extension.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension-$ExtensionRef.tgz" -UseBasicParsing
+                            Invoke-WebRequest -Uri "https://pecl.php.net/get/$($extension_orig.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
                         } catch {}
                     }
-                    & tar -xzf "$extension-$ExtensionRef.tgz" -C $currentDirectory
-                    Copy-Item -Path "$extension-$ExtensionRef\*" -Destination $currentDirectory -Recurse -Force
-                    Remove-Item -Path "$extension-$ExtensionRef" -Recurse -Force
+                    & tar -xzf "$extension_orig-$ExtensionRef.tgz" -C $currentDirectory
+                    Copy-Item -Path "$extension_orig-$ExtensionRef\*" -Destination $currentDirectory -Recurse -Force
+                    Remove-Item -Path "$extension_orig-$ExtensionRef" -Recurse -Force
                 } else {
                     if($null -ne $env:AUTH_TOKEN) {
                         $ExtensionUrl = $ExtensionUrl -replace '^https://', "https://${Env:AUTH_TOKEN}@"
@@ -65,10 +71,6 @@ function Get-Extension {
                       git submodule update --init --recursive > $null 2>&1
                     }
                 }
-            }
-
-            if($Extension.Contains("datadog_trace")) {
-                $Extension = "ddtrace"
             }
 
             & {
