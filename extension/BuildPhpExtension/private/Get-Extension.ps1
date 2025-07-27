@@ -86,8 +86,8 @@ function Get-Extension {
                     $name = $xml.SelectSingleNode("//p:name", $ns).InnerText
 
                     if (-not $name) { throw "<name> tag not found in XML" }
-                    if ($name -eq $currentDirectoryName) { return }
                     if ($name -eq "datadog_trace") { $name = "ddtrace" }
+                    if ($name -eq $currentDirectoryName) { return }
                     $newPath = Join-Path $parentDirectory $name
                     if (Test-Path $newPath) { throw "Target folder already exists: $newPath" }
 
