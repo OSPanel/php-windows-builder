@@ -61,9 +61,9 @@ function Get-Extension {
                     git remote add origin $ExtensionUrl > $null 2>&1
                     git fetch --depth=1 origin $ExtensionRef > $null 2>&1
                     git checkout FETCH_HEAD > $null 2>&1
-                    # if($Extension.Contains("ddtrace")) {
-                    #   git submodule update --init --recursive > $null 2>&1
-                    #}
+                    if($Extension.Contains("ddtrace")) {
+                      git submodule update --init --recursive > $null 2>&1
+                    }
                 }
             }
 
