@@ -9,6 +9,9 @@
     {
         "configure-options": [
         {
+            "name": "with-event"
+        },
+        {
             "name": "with-event-pthreads"
         },
         {
