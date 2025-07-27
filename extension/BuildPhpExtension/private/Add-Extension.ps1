@@ -35,7 +35,7 @@ Function Add-Extension {
             New-Item -Path "$currentDirectory\$cur_Extension" -ItemType Directory
         }
         & tar -xzf "$Extension.tgz" -C  "$currentDirectory\$cur_Extension"
-        Move-Item -Path "$cur_Extension\$Extension\*" -Destination "$cur_Extension" -Force
+        Move-Item -Path "$cur_Extension\$Extension-*\*" -Destination "$cur_Extension" -Force
         Set-Location "$cur_Extension"
         $extensionBuildDirectory = Join-Path -Path (Get-Location).Path -ChildPath $config.build_directory
         if($null -ne $env:GITHUB_REPOSITORY) {
