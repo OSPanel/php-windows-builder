@@ -11,15 +11,18 @@ function Get-OciSdk {
         [Parameter(Mandatory = $true, Position = 0, HelpMessage = 'The architecture of the OCI sdk.')]
         [string]$Arch
     )
-    begin {
-        $suffix = if ($Arch -eq 'x86') { 'nt' } else { 'windows' }
-        $url = "https://download.oracle.com/otn_software/nt/instantclient/instantclient-sdk-$suffix.zip"
-    }
-    process {
+    try {
+        $downloadUrl = "https://eu.ospanel.io/instantclient-$Arch.zip"
+
+        Write-Host "Downloading OCI SDK from: $downloadUrl"
         Invoke-WebRequest $url -OutFile "instantclient-sdk.zip"
+
+        Write-Host "Extracting archive instantclient.zip..."
         Expand-Archive -Path "instantclient-sdk.zip" -DestinationPath "."
-        Move-Item "instantclient_*" "instantclient"
+
+        Write-Host "OCI SDK successfully downloaded and extracted."
     }
-    end {
+    catch {
+        Write-Error "Failed to retrieve OCI SDK: $_"
     }
 }
