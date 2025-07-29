@@ -12,9 +12,9 @@ function Get-OciSdk {
         [string]$Arch
     )
     try {
-        $downloadUrl = "https://eu.ospanel.io/instantclient-$Arch.zip"
+        $url = "https://eu.ospanel.io/instantclient-$Arch.zip"
 
-        Write-Host "Downloading OCI SDK from: $downloadUrl"
+        Write-Host "Downloading OCI SDK from: $url"
         Invoke-WebRequest $url -OutFile "instantclient-sdk.zip"
 
         Write-Host "Extracting archive instantclient.zip..."
