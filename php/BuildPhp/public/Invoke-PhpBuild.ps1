@@ -62,7 +62,12 @@ function Invoke-PhpBuild {
         New-Item "$currentDirectory\artifacts" -ItemType "directory" -Force > $null 2>&1
         xcopy $artifacts "$currentDirectory\artifacts\*"
         Move-Item "$buildDirectory\php-$PhpVersion-src.zip" "$currentDirectory\artifacts\"
-        Compress-Archive -Path "$buildDirectory\config\$VsConfig.vs\$Arch\deps\bin\*" -DestinationPath "$currentDirectory\artifacts\php-$PhpVersion-bin.zip"
+        $paths = @(
+            "$buildDirectory\config\$VsConfig.vs\$Arch\deps\bin\*",
+            "$buildDirectory\config\$VsConfig.vs\$Arch\deps\share\*"
+        )
+
+        Compress-Archive -Path $paths -DestinationPath "$currentDirectory\artifacts\php-$PhpVersion-bin.zip"
 
         Set-Location "$currentDirectory"
     }
