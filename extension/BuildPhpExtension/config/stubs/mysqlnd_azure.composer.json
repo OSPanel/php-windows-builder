@@ -1,0 +1,13 @@
+{
+    "require":
+    {
+        "ext-mysqlnd": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-mysqlnd_azure=shared"
+        }]
+    }
+}

@@ -1,8 +1,13 @@
 {
-  "require": {
-    "openssl": "*"
+    "require":
+    {
+        "openssl": "*",
+        "zlib": "*",
+        "ext-zstd": "*",
+        "libsasl": "*"
   },
-  "php-ext": {
+    "php-ext":
+    {
     "configure-options": [
       {
         "name": "enable-mongodb"
@@ -12,7 +17,15 @@
       },
       {
         "name": "with-mongodb-client-side-encryption=yes"
-      }
-    ]
+        },
+        {
+            "name": "with-mongodb-zlib=bundled"
+        },
+        {
+            "name": "with-mongodb-zstd=yes"
+        },
+        {
+            "name": "with-mongodb-ssl=openssl"
+        }]
   }
 }
