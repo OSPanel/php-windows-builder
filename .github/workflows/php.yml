@@ -6,6 +6,21 @@ on:
       php-version:
         description: 'PHP version to build'
         required: true
+
+      arch:
+        description: 'Architecture'
+        required: true
+        type: choice
+        options: ['x64', 'x86']
+        default: 'x64'
+
+      ts:
+        description: 'Thread safety'
+        required: true
+        type: choice
+        options: ['ts', 'nts']
+        default: 'nts'
+
       upload:
         type: choice
         options: ['true', 'false']
@@ -25,6 +40,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Build
+        if: ${{ matrix.arch == github.event.inputs.arch && matrix.ts == github.event.inputs.ts }}
         uses: ./php
         with:
           php-version: ${{ github.event.inputs.php-version }}
@@ -43,4 +59,3 @@ jobs:
         with:
           name: artifacts
           delete-merged: true
- 
