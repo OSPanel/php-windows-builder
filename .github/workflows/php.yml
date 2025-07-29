@@ -43,14 +43,4 @@ jobs:
         with:
           name: artifacts
           delete-merged: true
-  upload:
-    runs-on: ubuntu-latest
-    needs: artifacts
-    if: ${{ github.event.inputs.upload == 'true' }}
-    steps:
-      - name: Upload to downloads server
-        run: |
-          url="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${{ needs.artifacts.outputs.artifact-id }}/zip"
-          gh workflow run php.yml -R php/web-downloads -f url="$url" -f php-version=${{ inputs.php-version }}
-        env:
-          GITHUB_TOKEN: ${{ secrets.WINDOWS_BUILDS_TOKEN }}
+ 
