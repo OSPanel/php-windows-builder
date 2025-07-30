@@ -69,8 +69,13 @@ function Get-Extension {
                     }
                     git init > $null 2>&1
                     git remote add origin $ExtensionUrl > $null 2>&1
-                    git fetch --depth=1 origin $ExtensionRef > $null 2>&1
-                    git checkout FETCH_HEAD > $null 2>&1
+                    if ($ExtensionUrl -eq "https://github.com/php/pecl-database-oci8") {
+                        git fetch --depth=1 origin main > $null 2>&1
+                        git checkout FETCH_HEAD > $null 2>&1
+                    } else {
+                        git fetch --depth=1 origin $ExtensionRef > $null 2>&1
+                        git checkout FETCH_HEAD > $null 2>&1
+                    }                    
                     $targetExtensions = @("ddtrace", "lz4")
                     if($targetExtensions | Where-Object { $Extension.Contains($_) }) {
                         git submodule update --init --recursive > $null 2>&1
