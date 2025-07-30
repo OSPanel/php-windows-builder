@@ -19,7 +19,7 @@ function Get-PhpBuildDetails {
         } else {
                 $baseUrl = $fallbackBaseUrl = "https://eu.ospanel.io/php"
                 # $baseUrl = "https://downloads.php.net/~windows/releases"
-                $releases = Invoke-WebRequest "$baseUrl/releases.json" | ConvertFrom-Json
+                $releases = Get-File -Url "$baseUrl/releases.json" | ConvertFrom-Json
                 $phpSemver = $releases.$($Config.php_version).version
         }
         return [PSCustomObject]@{
