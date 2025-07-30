@@ -35,7 +35,7 @@ Function Add-PhpDependencies {
                     throw "Failed to find $library"
                 }
                 $file = $matchesFound.Matches[0].Value.Trim()
-                Invoke-WebRequest "$phpBaseUrl/$($Config.vs_version)/$($Config.arch)/$file" -OutFile $library
+                Get-File -Url "$phpBaseUrl/$($Config.vs_version)/$($Config.arch)/$file" -OutFile $library
                 Expand-Archive $library "../deps"
                 Add-BuildLog tick "$library" "Added $($file -replace '\.zip$')"
             } catch {
