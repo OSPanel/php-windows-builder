@@ -64,9 +64,6 @@ Function Get-ExtensionConfig {
                 $ref = $Matches[1]
             }
             $packageName = $Extension
-            if($Extension.Contains("oci8")) {
-                $packageName = "oci8"
-            }
             if($Extension.Contains("datadog_trace")) {
                 $packageName = "ddtrace"
             }
