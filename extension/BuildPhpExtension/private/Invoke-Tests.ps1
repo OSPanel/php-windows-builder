@@ -16,7 +16,7 @@ Function Invoke-Tests {
         Add-StepLog "Running tests for $($Config.name) extension"
         try {
             $currentDirectory = (Get-Location).Path
-            $php_dir = Join-Path $currentDirectory php-bin
+            $php_dir = Join-Path $currentDirectory "..\php-bin"
             $env:TEST_PHP_EXECUTABLE = "$php_dir\php.exe"
             $env:REPORT_EXIT_STATUS = 1
             $env:XDEBUG_MODE = ""
