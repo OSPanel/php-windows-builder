@@ -80,7 +80,16 @@ function Invoke-PhpBuildExtension {
         Set-Location $currentDirectory
         Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
         Copy-Item -Path "$buildDirectory\*" -Destination "$currentDirectory\artifacts" -Force
-        Copy-Item -Path "$currentDirectory\*" -Destination "$currentDirectory\artifacts" -Force
+$currentDirectory = Get-Location
+$destination = Join-Path $currentDirectory "artifacts"
+
+# Получаем все элементы, кроме папки artifacts
+Get-ChildItem -Path $currentDirectory -Force | Where-Object {
+    $_.Name -ne "artifacts"
+} | ForEach-Object {
+    Copy-Item -Path $_.FullName -Destination $destination -Recurse -Force
+}
+        
     }
     end {
     }
