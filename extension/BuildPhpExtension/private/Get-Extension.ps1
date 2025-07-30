@@ -69,7 +69,7 @@ function Get-Extension {
                     }
                     git init > $null 2>&1
                     git remote add origin $ExtensionUrl > $null 2>&1
-                    if ($Extension -in @("oci8-12c", "oci8-19")) {
+                    if ($Extension -in @("oci8_12c", "oci8_19")) {
                         git fetch --depth=1 origin main > $null 2>&1
                     } else {
                         git fetch --depth=1 origin $ExtensionRef > $null 2>&1
