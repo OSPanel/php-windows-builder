@@ -19,10 +19,10 @@ Function Add-OciSdk {
             Get-File -Url $url -OutFile "instantclient-$_.zip"
             Expand-Archive -Path "instantclient-$_.zip" -DestinationPath "../deps" -Force
         }
-        Copy-Item ../deps/instantclient/sdk/* -Destination "../deps" -Recurse -Force
+        Copy-Item ../deps/instantclient_*/sdk/* -Destination "../deps" -Recurse -Force
         New-Item -ItemType Directory -Path "../deps/bin" -Force | Out-Null
-        Copy-Item ../deps/instantclient/* -Destination "../deps/bin" -Recurse -Force
-        Add-Path -PathItem (Join-Path (Get-Location).Path ../deps/bin)
+        Copy-Item ../deps/instantclient_*/* -Destination "../deps" -Recurse -Force
+        Add-Path -PathItem (Join-Path (Get-Location).Path ../deps)
     }
     end {
     }
