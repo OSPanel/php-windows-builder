@@ -41,10 +41,6 @@ function Get-Extension {
                         $Extension = "sodium"
                     }
                    
-                    if($Extension.Contains("oci8")) {
-                        $Extension = "pecl-database-oci8"
-                    }
-
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
                     if (-not (Test-Path $extensionPath)) {
@@ -73,7 +69,7 @@ function Get-Extension {
                     }
                     git init > $null 2>&1
                     git remote add origin $ExtensionUrl > $null 2>&1
-                    if ($Extension -in @("pecl-database-oci8", "pecl-database-pdo_oci")) {
+                    if ($Extension -in @("oci8-12c", "oci8-19")) {
                         git fetch --depth=1 origin main > $null 2>&1
                     } else {
                         git fetch --depth=1 origin $ExtensionRef > $null 2>&1
@@ -101,6 +97,7 @@ function Get-Extension {
 
                     if (-not $name) { throw "<name> tag not found in XML" }
                     if ($name -eq "datadog_trace") { $name = "ddtrace" }
+                    if ($name -eq "oci8") { $name = $Extension }
                     if ($name -eq $currentDirectoryName) { return }
                     $newPath = Join-Path $parentDirectory $name
                     if (Test-Path $newPath) { throw "Target folder already exists: $newPath" }
