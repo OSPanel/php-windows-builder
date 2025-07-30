@@ -17,7 +17,7 @@ function Get-Extension {
     begin {
     }
     process {
-        Add-StepLog "Fetching extension from $ExtensionUrl"
+        Add-StepLog "Fetching extension from $ExtensionUrl-$ExtensionRef.tgz"
         try {
             if(
             ($null -eq $ExtensionUrl -or $null -eq $ExtensionRef) -or
@@ -26,20 +26,43 @@ function Get-Extension {
                 throw "Both Extension URL and Extension Reference are required."
             }
             $currentDirectory = (Get-Location).Path
+                    $extension = Split-Path -Path $ExtensionUrl -Leaf
+                    $extension_orig = Split-Path -Path $ExtensionUrl -Leaf
+
+                    if($Extension.Contains("dd-trace-php")) {
+                        $Extension = "ddtrace"
+                    }
+
+                    if($Extension.Contains("datadog_trace")) {
+                        $Extension = "ddtrace"
+                    }
+
+                    if($Extension.Contains("libsodium")) {
+                        $Extension = "sodium"
+                    }
+
+                    $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
+
+                    if (-not (Test-Path $extensionPath)) {
+                        New-Item -Path $extensionPath -ItemType Directory | Out-Null
+                    }
+
+                    Set-Location -Path $extensionPath
+                    $currentDirectory = (Get-Location).Path
+                    
             if($null -ne $ExtensionUrl -and $null -ne $ExtensionRef) {
                 if ($ExtensionUrl -like "*pecl.php.net*") {
-                    $extension = Split-Path -Path $ExtensionUrl -Leaf
                     try {
-                        Invoke-WebRequest -Uri "https://pecl.php.net/get/$extension-$ExtensionRef.tgz" -OutFile "$extension-$ExtensionRef.tgz" -UseBasicParsing
+                        Invoke-WebRequest -Uri "https://pecl.php.net/get/$extension_orig-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
                     } catch {}
-                    if(-not(Test-Path "$extension-$ExtensionRef.tgz")) {
+                    if(-not(Test-Path "$extension_orig-$ExtensionRef.tgz")) {
                         try {
-                            Invoke-WebRequest -Uri "https://pecl.php.net/get/$($extension.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension-$ExtensionRef.tgz" -UseBasicParsing
+                            Invoke-WebRequest -Uri "https://pecl.php.net/get/$($extension_orig.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
                         } catch {}
                     }
-                    & tar -xzf "$extension-$ExtensionRef.tgz" -C $currentDirectory
-                    Copy-Item -Path "$extension-$ExtensionRef\*" -Destination $currentDirectory -Recurse -Force
-                    Remove-Item -Path "$extension-$ExtensionRef" -Recurse -Force
+                    & tar -xzf "$extension_orig-$ExtensionRef.tgz" -C $currentDirectory
+                    Copy-Item -Path "$extension_orig-$ExtensionRef\*" -Destination $currentDirectory -Recurse -Force
+                    Remove-Item -Path "$extension_orig-$ExtensionRef" -Recurse -Force
                 } else {
                     if($null -ne $env:AUTH_TOKEN) {
                         $ExtensionUrl = $ExtensionUrl -replace '^https://', "https://${Env:AUTH_TOKEN}@"
@@ -48,15 +71,62 @@ function Get-Extension {
                     git remote add origin $ExtensionUrl > $null 2>&1
                     git fetch --depth=1 origin $ExtensionRef > $null 2>&1
                     git checkout FETCH_HEAD > $null 2>&1
+                    $targetExtensions = @("ddtrace", "lz4")
+                    if($targetExtensions | Where-Object { $Extension.Contains($_) }) {
+                        git submodule update --init --recursive > $null 2>&1
+                    }
                 }
             }
 
+            & {
+                try {
+                    $currentDirectory = (Get-Location).Path
+                    $currentDirectoryName = Split-Path $currentDirectory -Leaf
+                    $parentDirectory = Split-Path $currentDirectory -Parent
+                    $xmlPath = Join-Path $currentDirectory "package.xml"
+                    if (-not (Test-Path $xmlPath)) { throw "package.xml not found at $xmlPath" }
+
+                    [xml]$xml = Get-Content $xmlPath
+                    $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+                    $ns.AddNamespace("p", "http://pear.php.net/dtd/package-2.0")
+                    $name = $xml.SelectSingleNode("//p:name", $ns).InnerText
+
+                    if (-not $name) { throw "<name> tag not found in XML" }
+                    if ($name -eq "datadog_trace") { $name = "ddtrace" }
+                    if ($name -eq $currentDirectoryName) { return }
+                    $newPath = Join-Path $parentDirectory $name
+                    if (Test-Path $newPath) { throw "Target folder already exists: $newPath" }
+
+                    Set-Location $parentDirectory
+                    Rename-Item -Path $currentDirectory -NewName $name
+
+                    Write-Host "Renamed folder:`n$currentDirectory`n>`n$newPath"
+                    Set-Location $newPath
+                } catch {
+                    Write-Host "Skipping rename: $_"
+                }
+            }
+
+            if($Extension.Contains("lz4")) {
+                    $currentDirectory = (Get-Location).Path
+                    $parentDirectory = Split-Path $currentDirectory -Parent
+                    Set-Location $parentDirectory
+                    Rename-Item -Path $currentDirectory -NewName lz4
+                    Set-Location lz4
+            }
+
+            $currentDirectory = (Get-Location).Path
+
+            $extension = Split-Path -Path (Get-Location) -Leaf
+
             $patches = $False
             if(Test-Path -PATH $PSScriptRoot\..\patches\$extension.ps1) {
-                if((Get-Content $PSScriptRoot\..\patches\$extension.ps1).Contains('config.w32')) {
-                     Add-Patches $extension
-                     $patches = $True
-                }
+                 Add-Patches $extension
+                 $patches = $True
+            }
+            if(Test-Path -PATH $PSScriptRoot\..\patches\$extension-$ExtensionRef.ps1) {
+                 Add-Patches "$extension-$ExtensionRef"
+                 $patches = $True
             }
 
             $configW32 = Get-ChildItem (Get-Location).Path -Recurse -Filter "config.w32" -ErrorAction SilentlyContinue
@@ -76,6 +146,10 @@ function Get-Extension {
             $name = ($extensionLine -replace '.*EXTENSION\(([^,]+),.*', '$1') -replace '["'']', ''
             if($name.Contains('oci8')) {
                 $name = 'oci8_19'
+            } elseif($name.Contains('libsodium')) {
+                $name = 'sodium'
+            } elseif($extension.Contains('mysql_xdevapi')) {
+                $name = 'mysql_xdevapi'
             } elseif ([string]$configW32Content -match ($([regex]::Escape($name)) + '\s*=\s*["''](.+?)["'']')) {
                 if($matches[1] -ne 'no') {
                     $name = $matches[1]
