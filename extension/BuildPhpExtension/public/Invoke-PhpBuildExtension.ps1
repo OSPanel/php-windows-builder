@@ -66,7 +66,7 @@ function Invoke-PhpBuildExtension {
         Set-Location "$buildDirectory"
         
         if (Test-Path '..\deps') { New-Item -ItemType Directory -Path 'deps' -Force | Out-Null; Copy-Item '..\deps\*' -Destination 'deps' -Recurse -Force }
-        
+        if (Test-Path '..\deps') { New-Item -ItemType Directory -Path 'deps2' -Force | Out-Null; Copy-Item '..\deps\*' -Destination 'deps2' -Recurse -Force }
         $config = @($config) | Where-Object { $_.GetType().FullName -eq 'System.Management.Automation.PSCustomObject' } | Select-Object -First 1
         
         Invoke-Build -Config $config
@@ -79,18 +79,8 @@ function Invoke-PhpBuildExtension {
 
         Set-Location $currentDirectory
         Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
-        Copy-Item -Path "C:\b\*" -Destination "$currentDirectory\artifacts" -Force
-        Copy-Item -Path "$buildDirectory\*" -Destination "$currentDirectory\artifacts" -Force
-$currentDirectory = Get-Location
-$destination = Join-Path $currentDirectory "artifacts"
-
-# Получаем все элементы, кроме папки artifacts
-Get-ChildItem -Path $currentDirectory -Force | Where-Object {
-    $_.Name -ne "artifacts"
-} | ForEach-Object {
-    Copy-Item -Path $_.FullName -Destination $destination -Recurse -Force
-}
-        
+        Copy-Item -Path "$buildDirectory\*" -Destination "$currentDirectory\artifacts" -Force 
+        Copy-Item -Path "$buildDirectory\deps2" -Destination "$currentDirectory\artifacts" -Force  
     }
     end {
     }
