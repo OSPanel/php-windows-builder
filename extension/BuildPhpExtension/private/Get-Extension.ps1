@@ -40,6 +40,15 @@ function Get-Extension {
                     if($Extension.Contains("libsodium")) {
                         $Extension = "sodium"
                     }
+
+                    if($Extension.Contains("oci8")) {
+                    if($ExtensionRef.Contains("12.0.0")) {
+                        $Extension = "oci8_12c"
+                    }
+                    if($ExtensionRef.Contains("19.0.0")) {
+                        $Extension = "oci8_19"
+                    }
+                    }
                    
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
