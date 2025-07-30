@@ -36,7 +36,7 @@ function Get-PhpBuild {
                 try {
                     Get-File -Url $fallBackUrl -OutFile $binZipFile
                 } catch {
-                    throw "Failed to download the build for PHP version $( $Config.php_version )."
+                    throw "Failed to download the build for PHP version $( $Config.php_version ). URL:$($binUrl)"
                 }
             }
 
