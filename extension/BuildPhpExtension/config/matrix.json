@@ -735,7 +735,7 @@
         },
         "source": "https://pecl.php.net/get/oauth"
     },
-    "oci8":
+    "pecl-database-oci8":
     {
         "ver":
         {
