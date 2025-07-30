@@ -65,18 +65,18 @@
         'Add-BuildRequirements',
         'Add-TestRequirements',
         'Add-Vs',
+        'Get-File',
         'Get-OciSdk',
         'Get-PhpBuild',
         'Get-PhpSdk',
         'Get-PhpSrc',
         'Get-PhpTestPack',
         'Get-TestSettings',
-        'Get-TestsList'
+        'Get-TestsList',
         'Get-VsVersionHelper',
         'Get-VsVersion',
-        'Set-PhpIniForTests'
-
-        # Public functions
+        'Set-NetSecurityProtocolType',
+        'Set-PhpIniForTests',
         'Invoke-PhpBuild',
         'Invoke-PhpTests'
     )
