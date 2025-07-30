@@ -16,10 +16,12 @@ Function Invoke-Build {
         Add-StepLog "Building $($Config.name) extension"
         try {
             Set-GAGroup start
-
-            $builder = "php-sdk\phpsdk-starter.bat"
+            Set-Location -Path (Join-Path -Path (Get-Location) -ChildPath $Config.name)
+            $builder = "..\php-sdk\phpsdk-starter.bat"
             $task = [System.IO.Path]::Combine($PSScriptRoot, '..\config\task.bat')
-
+            if($Config.php_version -eq '7.2') {
+                $task = [System.IO.Path]::Combine($PSScriptRoot, '..\config\task72.bat')
+            }
             $options = $Config.options
             if ($Config.debug_symbols) {
                 $options += " --enable-debug-pack"
@@ -30,6 +32,16 @@ Function Invoke-Build {
             if($env:ARTIFACT_NAMING_SCHEME -eq 'pecl') {
                 $ref = $Config.ref.ToLower()
             }
+
+            if($Config.name.Contains("redis")) {
+                if (Test-Path "..\igbinary\x64\Release\php_igbinary.lib") {
+                    Copy-Item "..\igbinary\x64\Release\php_igbinary.lib" "..\php-dev\lib\php_igbinary.lib" -Force
+                }
+                if (Test-Path "..\igbinary\x64\Release_TS\php_igbinary.lib") {
+                    Copy-Item "..\igbinary\x64\Release_TS\php_igbinary.lib" "..\php-dev\lib\php_igbinary.lib" -Force
+                }
+            }
+
             $suffix = "php_" + (@(
                 $Config.name,
                 $ref,
