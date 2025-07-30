@@ -67,8 +67,8 @@ Function Get-ExtensionConfig {
             if($Extension.Contains("oci8")) {
                 $packageName = "oci8"
             }
-            if($Extension.Contains("ddtrace")) {
-                $packageName = "datadog_trace"
+            if($Extension.Contains("datadog_trace")) {
+                $packageName = "ddtrace"
             }
             $config = [PSCustomObject]@{
                 name = $Extension
@@ -89,8 +89,8 @@ Function Get-ExtensionConfig {
                 build_directory = ""
             }
             $composerJson = $null
-            if((-not(Test-Path composer.json)) -and (Test-Path $PSScriptRoot\..\config\stubs\$packageName.composer.json)) {
-                Copy-Item $PSScriptRoot\..\config\stubs\$packageName.composer.json composer.json
+            if(Test-Path $PSScriptRoot\..\config\stubs\$Extension.composer.json) {
+                Copy-Item $PSScriptRoot\..\config\stubs\$Extension.composer.json composer.json
             }
             if(Test-Path composer.json) {
                 $composerJson = Get-Content composer.json -Raw | ConvertFrom-Json
@@ -111,15 +111,45 @@ Function Get-ExtensionConfig {
                 $Libraries = ($env:LIBRARIES -replace ' ', '') -split ','
             }
 
+            $standardExtensions = @(
+                "bcmath", "bz2", "calendar", "ctype", "curl", "date", "dba", "dom", "enchant",
+                "exif", "ffi", "fileinfo", "filter", "ftp", "gd", "gettext", "gmp", "hash",
+                "iconv", "imap", "intl", "json", "ldap", "libxml", "mbstring", "mysqli", "mysqlnd",
+                "odbc", "openssl", "pcntl", "pcre", "pdo", "pdo_dblib", "pdo_firebird", "pdo_mysql",
+                "pdo_oci", "pdo_odbc", "pdo_pgsql", "pdo_sqlite", "pgsql", "phar", "posix", "readline",
+                "reflection", "session", "shmop", "simplexml", "snmp", "soap", "sockets", "sodium",
+                "spl", "sqlite3", "standard", "sysvmsg", "sysvsem", "sysvshm", "tidy", "tokenizer",
+                "xml", "xmlreader", "xmlwriter", "xsl", "zip", "zlib"
+            )
+
             if($null -ne $composerJson) {
                 $composerJson."require" | ForEach-Object {
                     $_.PSObject.Properties | ForEach-Object {
                         if($_.Name -match "ext-") {
-                            $requiredExtension = $_.Name.replace("ext-", "")
+                            $requiredExtension = $_.Name.Replace("ext-", "")
+
+                            if (-not ($standardExtensions -contains $requiredExtension)) {
                             if($_.Value -match "\d+\.\d+.*") {
                                 $requiredExtension += "-$($_.Value)"
+                                } elseif ($_.Value -eq "*") {
+                                    $matrixFile = Join-Path $PSScriptRoot "..\config\matrix.json"
+                                    if (Test-Path $matrixFile) {
+                                        $matrix = Get-Content $matrixFile -Raw | ConvertFrom-Json
+                                        if ($matrix.PSObject.Properties.Name -eq $requiredExtension) {
+                                            $extInfo = $matrix.$requiredExtension
+                                            if ($extInfo.ver.PSObject.Properties.Name -eq $PhpVersion) {
+                                                $versionFromMatrix = $extInfo.ver.$PhpVersion
+                                                if (![string]::IsNullOrWhiteSpace($versionFromMatrix)) {
+                                                    $requiredExtension += "-$versionFromMatrix"
+                                                }
+                                            }
+                                        }
+                                    }
                             }
                             $config.extensions += $requiredExtension
+                                Write-Host "Added required extension: $requiredExtension"
+                            }
+
                         } elseif(-not($_.Name -match "php")) {
                             # If using the stub composer.json
                             $Libraries += $_.Name
@@ -199,7 +229,7 @@ Function Get-ExtensionConfig {
             }
 
             # TODO: This should be implemented using composer.json once implemented
-            $packageXml = Get-ChildItem (Get-Location).Path -Recurse -Filter "package.xml" -ErrorAction SilentlyContinue
+            $packageXml = Get-ChildItem (Get-Location).Path -Filter "package.xml" -ErrorAction SilentlyContinue
             if($null -ne $packageXml) {
                 $xml = [xml](Get-Content $packageXml.FullName)
                 $config.docs = $xml.SelectNodes("//*[@role='doc']") | ForEach-Object {
