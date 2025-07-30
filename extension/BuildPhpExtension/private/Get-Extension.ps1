@@ -26,7 +26,7 @@ function Get-Extension {
                 throw "Both Extension URL and Extension Reference are required."
             }
             $currentDirectory = (Get-Location).Path
-                    $extension = Split-Path -Path $ExtensionUrl -Leaf
+                    $Extension = Split-Path -Path $ExtensionUrl -Leaf
                     $extension_orig = Split-Path -Path $ExtensionUrl -Leaf
 
                     if($Extension.Contains("dd-trace-php")) {
@@ -45,7 +45,7 @@ function Get-Extension {
                         $Extension = "pecl-database-oci8"
                     }
 
-                    $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
+                    $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
                     if (-not (Test-Path $extensionPath)) {
                         New-Item -Path $extensionPath -ItemType Directory | Out-Null
@@ -73,13 +73,12 @@ function Get-Extension {
                     }
                     git init > $null 2>&1
                     git remote add origin $ExtensionUrl > $null 2>&1
-                    if ($ExtensionUrl -eq "https://github.com/php/pecl-database-oci8") {
+                    if ($Extension -eq "pecl-database-oci8") {
                         git fetch --depth=1 origin main > $null 2>&1
-                        git checkout FETCH_HEAD > $null 2>&1
                     } else {
                         git fetch --depth=1 origin $ExtensionRef > $null 2>&1
-                        git checkout FETCH_HEAD > $null 2>&1
-                    }                    
+                    }       
+                    git checkout FETCH_HEAD > $null 2>&1
                     $targetExtensions = @("ddtrace", "lz4")
                     if($targetExtensions | Where-Object { $Extension.Contains($_) }) {
                         git submodule update --init --recursive > $null 2>&1
@@ -126,15 +125,15 @@ function Get-Extension {
 
             $currentDirectory = (Get-Location).Path
 
-            $extension = Split-Path -Path (Get-Location) -Leaf
+            $Extension = Split-Path -Path (Get-Location) -Leaf
 
             $patches = $False
-            if(Test-Path -PATH $PSScriptRoot\..\patches\$extension.ps1) {
-                 Add-Patches $extension
+            if(Test-Path -PATH $PSScriptRoot\..\patches\$Extension.ps1) {
+                 Add-Patches $Extension
                  $patches = $True
             }
-            if(Test-Path -PATH $PSScriptRoot\..\patches\$extension-$ExtensionRef.ps1) {
-                 Add-Patches "$extension-$ExtensionRef"
+            if(Test-Path -PATH $PSScriptRoot\..\patches\$Extension-$ExtensionRef.ps1) {
+                 Add-Patches "$Extension-$ExtensionRef"
                  $patches = $True
             }
 
@@ -157,7 +156,7 @@ function Get-Extension {
                 $name = 'oci8_19'
             } elseif($name.Contains('libsodium')) {
                 $name = 'sodium'
-            } elseif($extension.Contains('mysql_xdevapi')) {
+            } elseif($Extension.Contains('mysql_xdevapi')) {
                 $name = 'mysql_xdevapi'
             } elseif ([string]$configW32Content -match ($([regex]::Escape($name)) + '\s*=\s*["''](.+?)["'']')) {
                 if($matches[1] -ne 'no') {
