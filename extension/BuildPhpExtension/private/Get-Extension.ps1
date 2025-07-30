@@ -53,11 +53,11 @@ function Get-Extension {
             if($null -ne $ExtensionUrl -and $null -ne $ExtensionRef) {
                 if ($ExtensionUrl -like "*pecl.php.net*") {
                     try {
-                        Invoke-WebRequest -Uri "https://pecl.php.net/get/$extension_orig-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
+                        Get-File -Url "https://pecl.php.net/get/$extension_orig-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz"
                     } catch {}
                     if(-not(Test-Path "$extension_orig-$ExtensionRef.tgz")) {
                         try {
-                            Invoke-WebRequest -Uri "https://pecl.php.net/get/$($extension_orig.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz" -UseBasicParsing
+                            Get-File -Url "https://pecl.php.net/get/$($extension_orig.ToUpper())-$ExtensionRef.tgz" -OutFile "$extension_orig-$ExtensionRef.tgz"
                         } catch {}
                     }
                     & tar -xzf "$extension_orig-$ExtensionRef.tgz" -C $currentDirectory
