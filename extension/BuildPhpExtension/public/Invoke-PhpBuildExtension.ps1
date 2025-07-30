@@ -78,8 +78,8 @@ function Invoke-PhpBuildExtension {
         Add-Package -Config $config
 
         Set-Location $currentDirectory
-
-        Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
+        Move-Item -Path "$buildDirectory\*" -Destination "$currentDirectory" -Force
+        # Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
     }
     end {
     }
