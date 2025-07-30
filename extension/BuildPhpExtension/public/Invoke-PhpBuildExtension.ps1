@@ -66,7 +66,7 @@ function Invoke-PhpBuildExtension {
         Set-Location "$buildDirectory"
         
         if (Test-Path '..\deps') { New-Item -ItemType Directory -Path 'deps' -Force | Out-Null; Copy-Item '..\deps\*' -Destination 'deps' -Recurse -Force }
-        if (Test-Path '..\deps') { New-Item -ItemType Directory -Path "$currentDirectory\artifacts" -Force | Out-Null; Copy-Item '..\deps\*' -Destination "$currentDirectory\artifacts" -Recurse -Force }
+        if (Test-Path '..\deps\bin') { New-Item -ItemType Directory -Path "$currentDirectory\artifacts" -Force | Out-Null; Copy-Item '..\deps\bin' -Destination "$currentDirectory\artifacts" -Recurse -Force }
         $config = @($config) | Where-Object { $_.GetType().FullName -eq 'System.Management.Automation.PSCustomObject' } | Select-Object -First 1
         
         Invoke-Build -Config $config
@@ -78,7 +78,7 @@ function Invoke-PhpBuildExtension {
         Add-Package -Config $config
 
         Set-Location $currentDirectory
-        Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
+        Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts\*" -Destination "$currentDirectory\artifacts" -Force
     }
     end {
     }
