@@ -1,12 +1,19 @@
 {
-  "require": {
-    "instantclient": "*"
-  },
-  "php-ext": {
-    "configure-options": [
-      {
-        "name": "with-oci8-19=../deps,shared"
-      }
-    ]
-  }
+    "require":
+    {
+        "instantclient": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "with-oci8=../deps,shared"
+        },
+        {
+            "name": "with-oci8-12c=../deps,shared"
+        },
+        {
+            "name": "with-oci8-19=../deps,shared"
+        }]
+    }
 }
