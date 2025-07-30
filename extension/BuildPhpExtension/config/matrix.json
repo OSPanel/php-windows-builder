@@ -847,6 +847,22 @@
         },
         "source": "https://pecl.php.net/get/pdo_ibm"
     },
+    "pdo_oci8":
+    {
+        "ver":
+        {
+            "7.2": "",
+            "7.3": "",
+            "7.4": "",
+            "8.0": "",
+            "8.1": "",
+            "8.2": "1.0.0",
+            "8.3": "1.0.0",
+            "8.4": "1.0.0",
+            "8.5": ""
+        },
+        "source": "https://github.com/php/pecl-database-pdo_oci"
+    },
     "pdo_sqlsrv":
     {
         "ver":
