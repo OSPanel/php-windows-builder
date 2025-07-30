@@ -79,7 +79,7 @@ function Invoke-PhpBuildExtension {
 
         Set-Location $currentDirectory
         Move-Item -Path "$buildDirectory\$($Config.package_name)\artifacts" -Destination "$currentDirectory" -Force
-        Copy-Item -Path "$buildDirectory\*" -Destination "$currentDirectory\artifacts" -Force
+        Copy-Item -Path "..\$buildDirectory\*" -Destination "$currentDirectory\artifacts" -Force
 $currentDirectory = Get-Location
 $destination = Join-Path $currentDirectory "artifacts"
 
