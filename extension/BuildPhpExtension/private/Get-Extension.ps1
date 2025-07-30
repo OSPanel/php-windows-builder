@@ -159,7 +159,7 @@ function Get-Extension {
             }
             $name = ($extensionLine -replace '.*EXTENSION\(([^,]+),.*', '$1') -replace '["'']', ''
             if($name.Contains('oci8')) {
-                $name = 'oci8'
+                $name = $Extension
             } elseif($name.Contains('libsodium')) {
                 $name = 'sodium'
             } elseif($Extension.Contains('mysql_xdevapi')) {
