@@ -40,6 +40,10 @@ function Get-Extension {
                     if($Extension.Contains("libsodium")) {
                         $Extension = "sodium"
                     }
+                   
+                    if($Extension.Contains("oci8")) {
+                        $Extension = "pecl-database-oci8"
+                    }
 
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $extension
 
