@@ -38,9 +38,9 @@ Function Add-Extension {
         $bat_content += "call phpize 2>&1"
         Write-Host "ARGUMENT: $argument"
             if($Config.php_version -eq '7.2') {
-        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--enable-fd-setsize=8192`" `"--with-odbcver=0x0380`" `"--enable-com-dotnet=shared`" `"--without-analyzer`" `"--with-mp=disable`" `"--with-prefix=$Prefix`" 2>&1"
+        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--with-prefix=$Prefix`" 2>&1"
             } else {
-        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--enable-fd-setsize=8192`" `"--with-odbcver=0x0380`" `"--enable-com-dotnet=shared`" `"--without-analyzer`" `"--with-mp=disable`" `"--enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2`" `"--with-prefix=$Prefix`" 2>&1"
+        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2`" `"--with-prefix=$Prefix`" 2>&1"
             }
 
         $bat_content += "nmake /nologo 2>&1"
