@@ -7,9 +7,6 @@
     {
         "configure-options": [
         {
-            "name": "with-oci8=../deps,shared"
-        },
-        {
             "name": "with-oci8-12c=../deps,shared"
         },
         {
