@@ -10,7 +10,7 @@ Function Add-Boost {
     }
     process {
         $url = "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.zip"
-        Invoke-WebRequest $url -OutFile "boost.zip"
+        Get-File -Url -OutFile "boost.zip"
         Expand-Archive -Path "boost.zip" -DestinationPath "../deps"
         if (-not (Test-Path "../deps/boost")) {
             New-Item -Path "../deps/boost" -ItemType Directory | Out-Null
