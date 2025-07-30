@@ -21,9 +21,9 @@ function Add-BuildRequirements {
     begin {
     }
     process {
-        Get-OciSdk -Arch $Arch
         Get-PhpSdk
         Get-PhpSrc -PhpVersion $PhpVersion
+        Get-OciSdk -PhpVersion $PhpVersion -Arch $Arch
     }
     end {
     }
