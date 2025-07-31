@@ -49,6 +49,8 @@ function Add-Package {
                 }
             }
 
+            if (Test-Path '..\deps\bin') { New-Item -ItemType Directory -Path "artifacts\artifacts-bin" -Force | Out-Null; Copy-Item '..\deps\bin' -Destination "artifacts\artifacts-bin" -Recurse -Force }
+
             if(Test-Path ..\deps\bin) {
                 $dllMap = Get-File -Url "https://downloads.php.net/~windows/pecl/deps/dllmapping.json"
                 Get-ChildItem -Path ..\deps\bin -Recurse -Include "*.dll" | ForEach-Object {
@@ -104,6 +106,7 @@ function Add-Package {
                     }
                 }
             }
+
             Add-Content "artifact=$artifact.zip" -Path $env:GITHUB_OUTPUT -Encoding utf8
 
             7z a -sdel "$artifact.zip" *
