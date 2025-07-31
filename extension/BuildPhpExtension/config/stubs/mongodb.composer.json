@@ -1,22 +1,23 @@
 {
     "require":
     {
+        "ext-apcu": "*",
         "openssl": "*",
         "zlib": "*",
         "ext-zstd": "*",
         "libsasl": "*"
-  },
+    },
     "php-ext":
     {
-    "configure-options": [
-      {
-        "name": "enable-mongodb"
-      },
-      {
-        "name": "with-mongodb-sasl=yes"
-      },
-      {
-        "name": "with-mongodb-client-side-encryption=yes"
+        "configure-options": [
+        {
+            "name": "enable-mongodb"
+        },
+        {
+            "name": "with-mongodb-sasl=yes"
+        },
+        {
+            "name": "with-mongodb-client-side-encryption=yes"
         },
         {
             "name": "with-mongodb-zlib=bundled"
@@ -27,5 +28,5 @@
         {
             "name": "with-mongodb-ssl=openssl"
         }]
-  }
+    }
 }
