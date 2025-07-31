@@ -48,10 +48,6 @@ function Get-Extension {
                     if($Extension.Contains("pdo_oci")) {
                         $Extension = "pdo_oci"
                     }
-
-                    if($Extension.Contains("rindow-openblas")) {
-                        $Extension = "rindow_openblas"
-                    }
                    
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
@@ -109,7 +105,6 @@ function Get-Extension {
 
                     if (-not $name) { throw "<name> tag not found in XML" }
                     if ($name -eq "datadog_trace") { $name = "ddtrace" }
-                    if ($name -eq "rindow-openblas") { $name = $Extension  }
                     if ($name -eq "oci8") { $name = $Extension }
                     if ($name -eq $currentDirectoryName) { return }
                     $newPath = Join-Path $parentDirectory $name
