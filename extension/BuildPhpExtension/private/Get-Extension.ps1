@@ -41,15 +41,6 @@ function Get-Extension {
                         $Extension = "sodium"
                     }
 
-                    if($Extension.Contains("oci8")) {
-                    if($ExtensionRef.Contains("12.0.0")) {
-                        $Extension = "oci8_12c"
-                    }
-                    if($ExtensionRef.Contains("19.0.0")) {
-                        $Extension = "oci8_19"
-                    }
-                    }
-                   
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
                     if (-not (Test-Path $extensionPath)) {
@@ -78,7 +69,7 @@ function Get-Extension {
                     }
                     git init > $null 2>&1
                     git remote add origin $ExtensionUrl > $null 2>&1
-                    if ($Extension -in @("oci8_12c", "oci8_19")) {
+                    if ($Extension -in @("oci8")) {
                         git fetch --depth=1 origin main > $null 2>&1
                     } else {
                         git fetch --depth=1 origin $ExtensionRef > $null 2>&1
