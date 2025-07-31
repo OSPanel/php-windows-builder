@@ -9,7 +9,7 @@ Function Add-Boost {
     begin {
     }
     process {
-        $url = "https://archives.boost.io/release/1.88.0/source/boost_1_88_0.zip"
+        $url = "https://archives.boost.io/release/1.88.0/source/boost_1_72_0.zip"
         Get-File -Url $url -OutFile "boost.zip"
         Expand-Archive -Path "boost.zip" -DestinationPath "../deps"
         if (-not (Test-Path "../deps/boost")) {
@@ -18,8 +18,8 @@ Function Add-Boost {
         if (-not (Test-Path "./boost")) {
             New-Item -Path "./boost" -ItemType Directory | Out-Null
         }
-        Copy-Item -Path "../deps/boost_1_88_0/*" -Destination "../deps/boost" -Recurse
-        Copy-Item -Path "../deps/boost_1_88_0/*" -Destination "./boost" -Recurse
+        Copy-Item -Path "../deps/boost_1_72_0/*" -Destination "../deps/boost" -Recurse
+        Copy-Item -Path "../deps/boost_1_72_0/*" -Destination "./boost" -Recurse
     }
     end {
     }
