@@ -9,7 +9,7 @@ Function Add-Boost {
     begin {
     }
     process {
-        $url = "https://archives.boost.io/release/1.88.0/source/boost_1_72_0.zip"
+        $url = "https://archives.boost.io/release/1.72.0/source/boost_1_72_0.zip"
         Get-File -Url $url -OutFile "boost.zip"
         Expand-Archive -Path "boost.zip" -DestinationPath "../deps"
         if (-not (Test-Path "../deps/boost")) {
