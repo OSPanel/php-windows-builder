@@ -50,7 +50,7 @@ function Get-Extension {
                     }
 
                     if($Extension.Contains("apcu_bc")) {
-                        $Extension = "apcu"
+                        $Extension = "apc"
                     }
                    
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
