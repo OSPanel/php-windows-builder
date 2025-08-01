@@ -49,6 +49,10 @@ function Get-Extension {
                         $Extension = "pdo_oci"
                     }
 
+                    if($Extension.Contains("apcu_bc")) {
+                        $Extension = "apc"
+                    }
+
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
                     if (-not (Test-Path $extensionPath)) {
@@ -106,6 +110,7 @@ function Get-Extension {
                     if (-not $name) { throw "<name> tag not found in XML" }
                     if ($name -eq "datadog_trace") { $name = "ddtrace" }
                     if ($name -eq "oci8") { $name = $Extension }
+                    if ($name -eq "apcu_bc") { $name = $Extension }
                     if ($name -eq $currentDirectoryName) { return }
                     $newPath = Join-Path $parentDirectory $name
                     if (Test-Path $newPath) { throw "Target folder already exists: $newPath" }
