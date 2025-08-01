@@ -42,6 +42,15 @@ Function Invoke-Build {
                 }
             }
 
+            if($Config.name -eq "apc") {
+                if (Test-Path "..\apcu\x64\Release\php_apcu.lib") {
+                    Copy-Item "..\apcu\x64\Release\php_apcu.lib" "..\php-dev\lib\php_apcu.lib" -Force
+                }
+                if (Test-Path "..\apcu\x64\Release_TS\php_apcu.lib") {
+                    Copy-Item "..\apcu\x64\Release_TS\php_apcu.lib" "..\php-dev\lib\php_apcu.lib" -Force
+                }
+            }
+
             $suffix = "php_" + (@(
                 $Config.name,
                 $ref,
