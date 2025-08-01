@@ -48,6 +48,10 @@ function Get-Extension {
                     if($Extension.Contains("pdo_oci")) {
                         $Extension = "pdo_oci"
                     }
+
+                    if($Extension.Contains("apcu_bc")) {
+                        $Extension = "apcu"
+                    }
                    
                     $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
