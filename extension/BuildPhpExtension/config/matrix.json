@@ -127,6 +127,22 @@
         },
         "source": "https://pecl.php.net/get/bitset"
     },
+    "doublemetaphone":
+    {
+        "ver":
+        {
+            "7.2": "1.0.1",
+            "7.3": "1.0.1",
+            "7.4": "1.0.1",
+            "8.0": "",
+            "8.1": "",
+            "8.2": "",
+            "8.3": "",
+            "8.4": "",
+            "8.5": ""
+        },
+        "source": "https://pecl.php.net/get/doublemetaphone"
+    },
     "brotli":
     {
         "ver":
@@ -462,6 +478,22 @@
             "8.5": ""
         },
         "source": "https://pecl.php.net/get/imagick"
+    },
+    "immutable_cache":
+    {
+        "ver":
+        {
+            "7.2": "6.1.0",
+            "7.3": "6.1.0",
+            "7.4": "6.1.0",
+            "8.0": "6.1.0",
+            "8.1": "6.1.0",
+            "8.2": "6.1.0",
+            "8.3": "6.1.0",
+            "8.4": "",
+            "8.5": ""
+        },
+        "source": "https://pecl.php.net/get/immutable_cache"
     },
     "imap":
     {
@@ -1278,6 +1310,22 @@
             "8.5": ""
         },
         "source": "https://pecl.php.net/get/sync"
+    },
+    "taint":
+    {
+        "ver":
+        {
+            "7.2": "2.1.0",
+            "7.3": "2.1.0",
+            "7.4": "2.1.0",
+            "8.0": "",
+            "8.1": "",
+            "8.2": "",
+            "8.3": "",
+            "8.4": "",
+            "8.5": ""
+        },
+        "source": "https://pecl.php.net/get/taint"
     },
     "tensor":
     {
