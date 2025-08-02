@@ -53,11 +53,11 @@ Function Get-ExtensionConfig {
     process {
         try {
             Add-StepLog "Reading build configuration for $Extension"
-            if(-not(Test-Path composer.json))
-            {
-                if(Test-Path $PSScriptRoot\..\config\stubs\$Extension.composer.json) {
-                    Copy-Item $PSScriptRoot\..\config\stubs\$Extension.composer.json composer.json
-                }
+            if(Test-Path $PSScriptRoot\..\config\stubs\$Extension.composer.json) {
+                Copy-Item $PSScriptRoot\..\config\stubs\$Extension.composer.json composer.json
+            }
+            if(Test-Path $PSScriptRoot\..\config\stubs\$Extension-$ExtensionRef.composer.json) {
+                Copy-Item $PSScriptRoot\..\config\stubs\$Extension-$ExtensionRef.composer.json composer.json
             }
             $ref = $ExtensionRef
             if ($ref -match 'refs/pull/(\d+)/merge') {
@@ -86,9 +86,7 @@ Function Get-ExtensionConfig {
                 build_directory = ""
             }
             $composerJson = $null
-            if(Test-Path $PSScriptRoot\..\config\stubs\$Extension.composer.json) {
-                Copy-Item $PSScriptRoot\..\config\stubs\$Extension.composer.json composer.json
-            }
+
             if(Test-Path composer.json) {
                 $composerJson = Get-Content composer.json -Raw | ConvertFrom-Json
             }
