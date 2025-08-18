@@ -14,6 +14,8 @@ function Invoke-PhpBuildExtension {
         Thread Safety
     .PARAMETER Libraries
         Libraries required by the extension
+    .PARAMETER ConfigureArgs
+        Additional arguments for the configure script
     #>
     [OutputType()]
     param (
@@ -32,7 +34,11 @@ function Invoke-PhpBuildExtension {
         [Parameter(Mandatory = $true, Position=4, HelpMessage='PHP Build Type')]
         [ValidateNotNull()]
         [ValidateSet('nts', 'ts')]
-        [string] $Ts
+        [string] $Ts,
+        [Parameter(Mandatory = $false, Position=5, HelpMessage='Libraries required by the extension')]
+        [string] $Libraries = '',
+        [Parameter(Mandatory = $false, Position=6, HelpMessage='Additional arguments for the configure script')]
+        [string] $Args = ''
     )
     begin {
     }
@@ -44,15 +50,21 @@ function Invoke-PhpBuildExtension {
             throw "PHP version $PhpVersion is not supported."
         }
 
+        if($null -ne $Libraries -and $Libraries -ne '') {
+            $env:LIBRARIES = $Libraries
+        }
+
+        if($null -ne $Args -and $Args -ne '') {
+            $env:CONFIGURE_ARGS = $Args
+        }
+
         $currentDirectory = (Get-Location).Path
 
         $buildDirectory = Get-BuildDirectory
 
-        Set-Location "$buildDirectory"
-
         $source = Get-ExtensionSource -ExtensionUrl $ExtensionUrl -ExtensionRef $ExtensionRef
 
-        $extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref
+        $extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -BuildDirectory $buildDirectory -LocalSrc $source.local
 
         Set-Location "$buildDirectory"
         
