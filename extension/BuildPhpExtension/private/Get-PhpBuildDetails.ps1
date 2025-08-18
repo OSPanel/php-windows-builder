@@ -17,8 +17,7 @@ function Get-PhpBuildDetails {
             $baseUrl = $fallbackBaseUrl = "https://github.com/shivammathur/php-builder-windows/releases/download/master"
             $PhpSemver = 'master'
         } else {
-                $baseUrl = $fallbackBaseUrl = "https://files.ospanel.io/php"
-                # $baseUrl = "https://downloads.php.net/~windows/releases"
+                $baseUrl = "https://files.ospanel.io/~windows/releases"
                 $releases = Invoke-WebRequest "$baseUrl/releases.json" | ConvertFrom-Json
                 $phpSemver = $releases.$($Config.php_version).version
         }
