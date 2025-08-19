@@ -19,7 +19,7 @@ on:
         description: 'Thread safety'
         required: true
         type: choice
-        options: ['ts', 'nts']
+        options: ['ts', 'nts', 'ts,nts']
         default: 'ts,nts'
 
       upload:
