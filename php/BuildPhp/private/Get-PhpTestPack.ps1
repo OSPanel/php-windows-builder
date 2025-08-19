@@ -28,8 +28,8 @@ function Get-PhpTestPack {
             $versionInUrl = "master"
         } else {
             $releaseState = if ($PhpVersion -match "[a-z]") {"qa"} else {"releases"}
-            $baseUrl = "https://downloads.php.net/~windows/$releaseState"
-            $fallbackBaseUrl = "https://downloads.php.net/~windows/$releaseState/archives"
+            $baseUrl = "https://files.ospanel.io/~windows/$releaseState"
+            $fallbackBaseUrl = "https://files.ospanel.io/~windows/$releaseState/archives"
         }
         $testZipFile = "php-test-pack-$versionInUrl.zip"
         $testUrl = "$baseUrl/$testZipFile"
