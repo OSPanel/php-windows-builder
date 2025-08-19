@@ -8,6 +8,8 @@ function Get-PhpSrc {
     [OutputType()]
     param (
         [Parameter(Mandatory = $true, Position=0, HelpMessage='PHP Version')]
+        [ValidateNotNull()]
+        [ValidateLength(1, [int]::MaxValue)]
         [string] $PhpVersion
     )
     begin {
@@ -42,7 +44,7 @@ function Get-PhpSrc {
             (Get-Content $mkdistFilePath) | ForEach-Object { $_ -replace '\$checksum \+= ord\(\$hdr_data\{\$i\}\);', '$checksum += ord($hdr_data[$i]);' } | Set-Content $mkdistFilePath
         }
 
-        [System.IO.Compression.ZipFile]::CreateFromDirectory($directoryPath, $srcZipFilePath)
+        [System.IO.Compression.ZipFile]::CreateFromDirectory($directoryPath,  $srcZipFilePath)
     }
     end {
     }

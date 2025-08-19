@@ -11,8 +11,10 @@ function Invoke-PhpBuild {
     #>
     [OutputType()]
     param (
-        [Parameter(Mandatory = $false, Position=0, HelpMessage='PHP Version')]
-        [string] $PhpVersion = '',
+        [Parameter(Mandatory = $true, Position=0, HelpMessage='PHP Version')]
+        [ValidateNotNull()]
+        [ValidateLength(1, [int]::MaxValue)]
+        [string] $PhpVersion,
         [Parameter(Mandatory = $true, Position=1, HelpMessage='PHP Architecture')]
         [ValidateNotNull()]
         [ValidateSet('x86', 'x64')]
@@ -26,11 +28,6 @@ function Invoke-PhpBuild {
     }
     process {
         Set-NetSecurityProtocolType
-        $fetchSrc = $True
-        if($null -eq $PhpVersion -or $PhpVersion -eq '') {
-            $fetchSrc = $False
-            $PhpVersion = Get-SourcePhpVersion
-        }
         $VsConfig = (Get-VsVersion -PhpVersion $PhpVersion)
         if($null -eq $VsConfig.vs) {
             throw "PHP version $PhpVersion is not supported."
@@ -46,15 +43,11 @@ function Invoke-PhpBuild {
 
         Set-Location "$buildDirectory"
 
-        Add-BuildRequirements -PhpVersion $PhpVersion -Arch $Arch -FetchSrc:$fetchSrc
+        Add-BuildRequirements -PhpVersion $PhpVersion -Arch $Arch
 
         Copy-Item -Path $PSScriptRoot\..\config -Destination . -Recurse
         $buildPath = "$buildDirectory\config\$($VsConfig.vs)\$Arch\php-$PhpVersion"
-        $sourcePath = "$buildDirectory\php-$PhpVersion-src"
-        if(-not($fetchSrc)) {
-            $sourcePath = $currentDirectory
-        }
-        New-Item -ItemType SymbolicLink -Path $buildPath -Target $sourcePath -Force > $null 2>&1
+        Move-Item "$buildDirectory\php-$PhpVersion-src" $buildPath
         Set-Location "$buildPath"
         New-Item "..\obj" -ItemType "directory" > $null 2>&1
         Copy-Item "..\$(($PhpVersion -replace '^(\d+\.\d+).*', '$1'))\config.$Ts.bat"

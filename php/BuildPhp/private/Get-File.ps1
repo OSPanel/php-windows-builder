@@ -35,9 +35,9 @@ Function Get-File {
     for ($i = 0; $i -lt $Retries; $i++) {
         try {
             if($OutFile -ne '') {
-                Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec $TimeoutSec -UseBasicParsing
+                Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec $TimeoutSec
             } else {
-                Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec -UseBasicParsing
+                Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec
             }
             break;
         } catch {
@@ -45,15 +45,15 @@ Function Get-File {
                 if($FallbackUrl) {
                     try {
                         if($OutFile -ne '') {
-                            Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec -UseBasicParsing
+                            Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec
                         } else {
-                            Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec -UseBasicParsing
+                            Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec
                         }
                     } catch {
-                        throw "Failed to download the file from $Url and $FallbackUrl - $($_.Exception.Message)"
+                        throw "Failed to download the file from $Url and $FallbackUrl"
                     }
                 } else {
-                    throw "Failed to download the file from $Url - $($_.Exception.Message)"
+                    throw "Failed to download the file from $Url"
                 }
             }
         }

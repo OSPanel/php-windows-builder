@@ -33,8 +33,8 @@ function Invoke-PhpTests {
     }
     process {
         Set-NetSecurityProtocolType
-        $VsData = (Get-VsVersion -PhpVersion $PhpVersion)
-        if($null -eq $VsData) {
+        $VsVersion = (Get-VsVersion -PhpVersion $PhpVersion)
+        if($null -eq $VsVersion) {
             throw "PHP version $PhpVersion is not supported."
         }
 
@@ -50,7 +50,7 @@ function Invoke-PhpTests {
 
         Set-Location "$buildDirectory"
 
-        Add-TestRequirements -PhpVersion $PhpVersion -Arch $Arch -Ts $Ts -VsVersion $VsData -TestsDirectory $testsDirectory
+        Add-TestRequirements -PhpVersion $PhpVersion -Arch $Arch -Ts $Ts -VsVersion $VsVersion -TestsDirectory $testsDirectory
 
         Set-PhpIniForTests -BuildDirectory $buildDirectory -Opcache $Opcache
 
