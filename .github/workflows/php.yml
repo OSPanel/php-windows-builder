@@ -37,8 +37,21 @@ jobs:
     steps:
       - id: set-matrix
         run: |
-          echo "Generating matrix for arch=${{ github.event.inputs.arch }}, ts=${{ github.event.inputs.ts }}"
-          echo "matrix={\"include\":[{\"arch\":\"${{ github.event.inputs.arch }}\",\"ts\":\"${{ github.event.inputs.ts }}\"}]}" >> $GITHUB_OUTPUT
+          ARCH="${{ github.event.inputs.arch }}"
+          TS_INPUT="${{ github.event.inputs.ts }}"
+
+          IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
+          
+          MATRIX_JSON="{\"include\":["
+          SEP=""
+          for TS in "${TS_VALUES[@]}"; do
+            MATRIX_JSON+="${SEP}{\"arch\":\"$ARCH\",\"ts\":\"$TS\"}"
+            SEP=","
+          done
+          MATRIX_JSON+="]}"
+
+          echo "Generated matrix: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
 
   php:
     needs: generate-matrix
