@@ -60,7 +60,7 @@ function Get-PhpBuild {
             try {
                 Get-File -Url $fallBackUrl -OutFile $binZipFile
             } catch {
-                throw "Failed to download the build for PHP version $PhpVersion - $binUrl - $fallbackBaseUrl"
+                throw "Failed to download the build for PHP version $PhpVersion - $binUrl - $fallBackUrl"
             }
         }
 
