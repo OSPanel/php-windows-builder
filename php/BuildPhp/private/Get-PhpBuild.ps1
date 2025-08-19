@@ -36,7 +36,7 @@ function Get-PhpBuild {
 
         if($null -eq $VsVersion) {
             $VsVersion = (Get-VsVersion -PhpVersion $PhpVersion)
-            if($null -eq $VsVersion) {
+            if($null -eq $VsVersion.vs) {
                 throw "PHP version $PhpVersion is not supported."
             }
         }
@@ -50,7 +50,7 @@ function Get-PhpBuild {
             $fallbackBaseUrl = "https://downloads.php.net/~windows/$releaseState/archives"
         }
         $tsPart = if ($Ts -eq "nts") {"nts-Win32"} else {"Win32"}
-        $binZipFile = "php-$versionInUrl-$tsPart-$VsVersion-$Arch.zip"
+        $binZipFile = "php-$versionInUrl-$tsPart-$VsVersion.vs-$Arch.zip"
         $binUrl = "$baseUrl/$binZipFile"
         $fallBackUrl = "$fallbackBaseUrl/$binZipFile"
 
