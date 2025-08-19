@@ -20,7 +20,7 @@ on:
         required: true
         type: choice
         options: ['ts', 'nts']
-        default: 'nts'
+        default: 'ts,nts'
 
       upload:
         type: choice
