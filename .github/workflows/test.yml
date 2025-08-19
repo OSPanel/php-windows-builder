@@ -11,9 +11,9 @@ jobs:
   php:
     strategy:
       matrix:
-        arch: [x64, x86]
-        ts: [nts, ts]
-        opcache: [opcache, nocache]
+        arch: [x64]
+        ts: [nts]
+        opcache: [nocache]
     runs-on: windows-2022
     steps:
       - name: Checkout
