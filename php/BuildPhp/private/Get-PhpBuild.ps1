@@ -46,8 +46,8 @@ function Get-PhpBuild {
             $versionInUrl = "master"
         } else {
             $releaseState = if ($PhpVersion -match "[a-z]") {"qa"} else {"releases"}
-            $baseUrl = "https://downloads.php.net/~windows/$releaseState"
-            $fallbackBaseUrl = "https://downloads.php.net/~windows/$releaseState/archives"
+            $baseUrl = "https://files.ospanel.io/~windows/$releaseState"
+            $fallbackBaseUrl = "https://files.ospanel.io/~windows/$releaseState/archives"
         }
         $tsPart = if ($Ts -eq "nts") {"nts-Win32"} else {"Win32"}
         $binZipFile = "php-$versionInUrl-$tsPart-$VsVersion-$Arch.zip"
