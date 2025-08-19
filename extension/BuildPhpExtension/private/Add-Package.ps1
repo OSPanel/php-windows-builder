@@ -52,7 +52,7 @@ function Add-Package {
             if (Test-Path '..\deps\bin') { New-Item -ItemType Directory -Path "artifacts\artifacts-bin" -Force | Out-Null; Copy-Item '..\deps\bin' -Destination "artifacts\artifacts-bin" -Recurse -Force }
 
             if(Test-Path ..\deps\bin) {
-                $dllMap = Get-File -Url "https://downloads.php.net/~windows/pecl/deps/dllmapping.json"
+                $dllMap = Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/dllmapping.json"
                 Get-ChildItem -Path ..\deps\bin -Recurse -Include "*.dll" | ForEach-Object {
                     if($dllMap.content.Contains($_.Name)) {
                         if(-not(Test-Path "php-bin\$($_.Name)")) {
