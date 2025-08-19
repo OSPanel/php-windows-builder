@@ -31,7 +31,7 @@ Function Add-ExtensionDependencies {
                         Add-OdbcCli -Config $Config
                     }
                     Default {
-                        $url = "https://downloads.php.net/~windows/pecl/deps/$_"
+                        $url = "https://files.ospanel.io/~windows/pecl/deps/$_"
                         Get-File -Url $url -OutFile $_
                         Expand-Archive -Path $_ -DestinationPath "..\deps" -Force
                         if(Test-Path "..\deps\LICENSE") {
