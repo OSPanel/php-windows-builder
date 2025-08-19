@@ -194,9 +194,9 @@ Function Get-ExtensionConfig {
             }
 
             if($Libraries.Count -gt 0) {
-                $phpSeries = Get-File -Url "https://downloads.php.net/~windows/php-sdk/deps/$VsVersion/$Arch"
-                $extensionSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps"
-                $extensionArchivesSeries = Get-File -Url "https://downloads.php.net/~windows/pecl/deps/archives"
+                $phpSeries = Get-File -Url "https://files.ospanel.io/~windows/php-sdk/deps/$VsVersion/$Arch"
+                $extensionSeries = Get-File -Url "https://files.ospanel.io/~windows/pecl/deps"
+                $extensionArchivesSeries = Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/archives"
             }
             $thirdPartyLibraries = @("boost", "instantclient", "odbc_cli")
             $Libraries | Select-Object -Unique | ForEach-Object {
