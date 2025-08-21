@@ -25,10 +25,13 @@ Function Add-Extension {
         $currentDirectory = (Get-Location).Path
         $matrix = (Get-Content "$PSScriptRoot\..\config\matrix.json" -Raw | ConvertFrom-Json)
         $extensionName, $extensionVersion = $Extension -split '-', 2
+        $url = $matrix.$extensionName.source
+        $ref = $extensionVersion
+        $local = ($null -eq $url -or $ref -eq '')
         $source = @{
-            url = $matrix.$extensionName.source
-            ref = $extensionVersion
-            local = ($null -eq url -or ref -eq '')
+            url   = $url
+            ref   = $ref
+            local = $local
         }
         $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -BuildDirectory $currentDirectory -LocalSrc $source.local
 
