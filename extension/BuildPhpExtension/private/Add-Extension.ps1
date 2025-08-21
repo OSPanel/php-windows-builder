@@ -28,10 +28,9 @@ Function Add-Extension {
         $source = @{
             url = $matrix.$extensionName.source
             ref = $extensionVersion
+            local = ($null -eq url -or ref -eq '')
         }
-        $buildDirectory = Get-BuildDirectory
-        $source = Get-ExtensionSource -ExtensionUrl $source.url -ExtensionRef $source.ref
-        $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -BuildDirectory $buildDirectory -LocalSrc $source.local
+        $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -BuildDirectory $currentDirectory -LocalSrc $source.local
 
         $configW32Content = [string](Get-Content -Path "config.w32")
         $argument = Get-ArgumentFromConfig $Extension $configW32Content
