@@ -701,7 +701,7 @@
             "8.4": "3.3.0",
             "8.5": ""
         },
-        "source": "https://pecl.php.net/get/memcached"
+        "source": "https://github.com/OSPanel/php-memcached"
     },
     "mongodb":
     {
