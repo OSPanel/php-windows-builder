@@ -11,8 +11,7 @@
     {
         "configure-options": [
         {
-            "name": "enable-yar",
-            "name": "enable-msgpack"
+            "name": "enable-yar"
         }]
     }
 }
