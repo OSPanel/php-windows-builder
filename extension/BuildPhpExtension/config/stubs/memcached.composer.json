@@ -3,6 +3,11 @@
     {
         "ext-igbinary": "*",
         "ext-msgpack": "*",
+        "ext-lz4": "*",
+        "ext-lzf": "*",
+        "ext-zstd": "*",
+        "libsasl": "*",
+        "libzstd": "*",
         "libsasl": "*"
     },
     "php-ext":
