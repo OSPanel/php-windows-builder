@@ -4,6 +4,7 @@
         "openssl": "*",
         "libcurl": "*",
         "nghttp2": "*",
+        "ext-msgpack": "*",
         "libssh2": "*"
     },
     "php-ext":
