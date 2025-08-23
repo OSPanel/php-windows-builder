@@ -42,6 +42,15 @@ Function Invoke-Build {
                 }
             }
 
+            if ($Config.name -match 'memcached') {
+                if (Test-Path "..\igbinary\x64\Release\php_msgpack.lib") {
+                    Copy-Item "..\igbinary\x64\Release\php_msgpack.lib" "..\php-dev\lib\php_msgpack.lib" -Force
+                }
+                if (Test-Path "..\igbinary\x64\Release_TS\php_msgpack.lib") {
+                    Copy-Item "..\igbinary\x64\Release_TS\php_msgpack.lib" "..\php-dev\lib\php_msgpack.lib" -Force
+                }
+            }
+
             if($Config.name -eq "apc") {
                 if (Test-Path "..\apcu\x64\Release\php_apcu.lib") {
                     Copy-Item "..\apcu\x64\Release\php_apcu.lib" "..\php-dev\lib\php_apcu.lib" -Force
