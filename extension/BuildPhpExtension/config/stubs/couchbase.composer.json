@@ -1,6 +1,7 @@
 {
     "require":
     {
+        "ext-apcu": "*",
         "ext-igbinary": "*",
         "ext-json": "*",
         "ext-lzf": "*",
