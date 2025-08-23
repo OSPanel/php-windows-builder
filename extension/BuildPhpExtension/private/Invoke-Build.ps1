@@ -33,7 +33,7 @@ Function Invoke-Build {
                 $ref = $Config.ref.ToLower()
             }
 
-            if($Config.name.Contains("redis")) {
+            if ($Config.name -match 'redis|memcached|couchbase') {
                 if (Test-Path "..\igbinary\x64\Release\php_igbinary.lib") {
                     Copy-Item "..\igbinary\x64\Release\php_igbinary.lib" "..\php-dev\lib\php_igbinary.lib" -Force
                 }
