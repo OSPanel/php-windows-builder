@@ -1,0 +1,17 @@
+{
+    "require":
+    {
+        "ext-apcu": "*",
+        "ext-igbinary": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-immutable-cache"
+        },
+        {
+            "name": "enable-immutable-cache-igbinary"
+        }]
+    }
+}
