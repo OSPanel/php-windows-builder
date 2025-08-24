@@ -1,0 +1,14 @@
+{
+    "require":
+    {
+        "ext-raphf": "*",
+        "ext-propro": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-http"
+        }]
+    }
+}
