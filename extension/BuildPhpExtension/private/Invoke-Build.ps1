@@ -49,6 +49,7 @@ Function Invoke-Build {
                 if (Test-Path "..\raphf\x64\Release_TS\php_raphf.lib") {
                     Copy-Item "..\raphf\x64\Release_TS\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
                 }
+                Copy-Item -Path "..\php-dev\include\ext\hash\*" -Destination "..\pecl\hash" -Recurse -Force
             }
 
             if ($Config.name -match 'memcached') {
