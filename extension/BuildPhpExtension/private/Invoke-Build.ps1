@@ -43,17 +43,11 @@ Function Invoke-Build {
             }
             
             if ($Config.name -match 'http') {
-                if (Test-Path "..\msgpack\x64\Release\php_raphf.lib") {
-                    Copy-Item "..\msgpack\x64\Release\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
+                if (Test-Path "..\raphf\x64\Release\php_raphf.lib") {
+                    Copy-Item "..\raphf\x64\Release\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
                 }
-                if (Test-Path "..\msgpack\x64\Release_TS\php_raphf.lib") {
-                    Copy-Item "..\msgpack\x64\Release_TS\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
-                }
-                if (Test-Path "..\msgpack\x64\Release\php_propro.lib") {
-                    Copy-Item "..\msgpack\x64\Release\php_propro.lib" "..\php-dev\lib\php_propro.lib" -Force
-                }
-                if (Test-Path "..\msgpack\x64\Release_TS\php_propro.lib") {
-                    Copy-Item "..\msgpack\x64\Release_TS\php_propro.lib" "..\php-dev\lib\php_propro.lib" -Force
+                if (Test-Path "..\raphf\x64\Release_TS\php_raphf.lib") {
+                    Copy-Item "..\raphf\x64\Release_TS\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
                 }
             }
 
