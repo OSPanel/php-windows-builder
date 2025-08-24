@@ -51,13 +51,12 @@ function Get-Extension {
                 $Extension = Split-Path -Path $ExtensionUrl -Leaf
                 $extension_orig = $Extension
                 
-                if ($name -eq "pecl_http") { $name = "http" }
-                if ($Extension.Contains("dd-trace-php")) { $Extension = "ddtrace" }
+                if ($Extension.Contains("pecl_http"))        { $Extension = "http" }
+                if ($Extension.Contains("dd-trace-php"))     { $Extension = "ddtrace" }
                 if ($Extension.Contains("datadog_trace"))    { $Extension = "ddtrace" }
                 if ($Extension.Contains("libsodium"))        { $Extension = "sodium" }
                 if ($Extension.Contains("oci8"))             { $Extension = "oci8_19" }
                 if ($Extension.Contains("pdo_oci"))          { $Extension = "pdo_oci" }
-                if ($Extension.Contains("apcu_bc"))          { $Extension = "apc" }
 
                 $extensionPath = Join-Path -Path $currentDirectory -ChildPath $Extension
 
@@ -126,10 +125,10 @@ function Get-Extension {
                             $name = $xml.SelectSingleNode("//p:name", $ns).InnerText
                             if (-not $name) { throw "<name> tag not found in XML" }
                         }
-
+                        
+                        if ($name -eq "pecl_http") { $name = "http" }
                         if ($name -eq "datadog_trace") { $name = "ddtrace" }
                         if ($name -eq "oci8")          { $name = $Extension }
-                        if ($name -eq "apcu_bc")       { $name = $Extension }
 
                         if ($name -eq $currentDirectoryName) { return }
 
