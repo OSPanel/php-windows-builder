@@ -64,7 +64,8 @@ Function Add-Extension {
         Write-Host (Get-Content "build-$suffix.txt" -Raw)
         $includePath = "$currentDirectory\php-dev\include"
         New-Item -Path $includePath\ext -Name $Extension -ItemType "directory" | Out-Null
-        Get-ChildItem -Path (Get-Location).Path -Recurse -Include '*.h', '*.c' | Copy-Item -Destination "$includePath\ext\$Extension"
+        # Get-ChildItem -Path (Get-Location).Path -Recurse -Include '*.h', '*.c' | Copy-Item -Destination "$includePath\ext\$Extension"
+        Copy-Item -Path (Get-Location).Path\* -Destination "$includePath\ext\$Extension" -Recurse -Force
         Copy-Item -Path "$extensionBuildDirectory\*.dll" -Destination "$currentDirectory\php-bin\ext" -Force
         Copy-Item -Path "$extensionBuildDirectory\*.lib" -Destination "$currentDirectory\php-dev\lib" -Force
         Add-Content -Path "$currentDirectory\php-bin\php.ini" -Value "extension=$Extension"
