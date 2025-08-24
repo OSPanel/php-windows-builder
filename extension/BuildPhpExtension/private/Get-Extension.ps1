@@ -114,14 +114,17 @@ function Get-Extension {
                         $parentDirectory = Split-Path $currentDirectory -Parent
                         $xmlPath = Join-Path $currentDirectory "package.xml"
 
-                        if (-not (Test-Path $xmlPath)) { throw "package.xml not found at $xmlPath" }
+                        if ($currentDirectoryName -eq "php-firebird") { 
+                            $name = "interbase"
+                        } else {
+                            if (-not (Test-Path $xmlPath)) { throw "package.xml not found at $xmlPath" }
+                            [xml]$xml = Get-Content $xmlPath
+                            $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
+                            $ns.AddNamespace("p", "http://pear.php.net/dtd/package-2.0")
 
-                        [xml]$xml = Get-Content $xmlPath
-                        $ns = New-Object System.Xml.XmlNamespaceManager($xml.NameTable)
-                        $ns.AddNamespace("p", "http://pear.php.net/dtd/package-2.0")
-
-                        $name = $xml.SelectSingleNode("//p:name", $ns).InnerText
-                        if (-not $name) { throw "<name> tag not found in XML" }
+                            $name = $xml.SelectSingleNode("//p:name", $ns).InnerText
+                            if (-not $name) { throw "<name> tag not found in XML" }
+                        }
 
                         if ($name -eq "datadog_trace") { $name = "ddtrace" }
                         if ($name -eq "oci8")          { $name = $Extension }
