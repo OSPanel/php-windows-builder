@@ -50,7 +50,8 @@ function Get-Extension {
                 $currentDirectory = (Get-Location).Path
                 $Extension = Split-Path -Path $ExtensionUrl -Leaf
                 $extension_orig = $Extension
-
+                
+                if ($name -eq "pecl_http") { $name = "http" }
                 if ($Extension.Contains("dd-trace-php")) { $Extension = "ddtrace" }
                 if ($Extension.Contains("datadog_trace"))    { $Extension = "ddtrace" }
                 if ($Extension.Contains("libsodium"))        { $Extension = "sodium" }
