@@ -1,0 +1,13 @@
+{
+    "require":
+    {
+        "fbclient": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "with-interbase"
+        }]
+    }
+}
