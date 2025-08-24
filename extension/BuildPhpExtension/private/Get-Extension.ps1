@@ -114,7 +114,7 @@ function Get-Extension {
                         $parentDirectory = Split-Path $currentDirectory -Parent
                         $xmlPath = Join-Path $currentDirectory "package.xml"
 
-                        if ($name -eq "php-firebird") { 
+                        if ($currentDirectoryName -eq "php-firebird") { 
                             $name = "interbase"
                         } else {
                             if (-not (Test-Path $xmlPath)) { throw "package.xml not found at $xmlPath" }
