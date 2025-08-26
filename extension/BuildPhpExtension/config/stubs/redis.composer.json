@@ -6,7 +6,8 @@
         "ext-msgpack": "*",
         "ext-zstd": "*",
         "ext-lzf": "*",
-        "zlib": "*"
+        "zlib": "*",
+        "libzstd": "*"
     },
     "php-ext":
     {
