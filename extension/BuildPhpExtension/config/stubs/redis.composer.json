@@ -2,8 +2,7 @@
     "require":
     {
         "ext-apcu": "*",
-        "ext-igbinary": "*",
-        "ext-msgpack": "*"
+        "ext-igbinary": "*"
     },
     "php-ext":
     {
