@@ -51,15 +51,6 @@ Function Invoke-Build {
                 }
             }
 
-            if ($Config.name -match 'phpredis|redis') {
-                if (Test-Path "..\lzf\x64\Release\php_lzf.lib") {
-                    Copy-Item "..\lzf\x64\Release\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
-                }
-                if (Test-Path "..\lzf\x64\Release_TS\php_lzf.lib") {
-                    Copy-Item "..\lzf\x64\Release_TS\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
-                }
-            }
-
             if ($Config.name -match 'apc|memcached|couchbase') {
                 if (Test-Path "..\apcu\x64\Release\php_apcu.lib") {
                     Copy-Item "..\apcu\x64\Release\php_apcu.lib" "..\php-dev\lib\php_apcu.lib" -Force
