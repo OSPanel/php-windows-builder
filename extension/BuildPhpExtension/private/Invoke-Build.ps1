@@ -53,7 +53,7 @@ Function Invoke-Build {
 
             if ($Config.name -match 'phpredis|redis') {
                 if (Test-Path "..\zstd\x64\Release\php_zstd.lib") {
-                    Copy-Item "..\zstd\x64\Release\php_msgpack.lib" "..\php-dev\lib\php_zstd.lib" -Force
+                    Copy-Item "..\zstd\x64\Release\php_zstd.lib" "..\php-dev\lib\php_zstd.lib" -Force
                 }
                 if (Test-Path "..\zstd\x64\Release_TS\php_zstd.lib") {
                     Copy-Item "..\zstd\x64\Release_TS\php_zstd.lib" "..\php-dev\lib\php_zstd.lib" -Force
