@@ -733,7 +733,7 @@
             "8.4": "3.0.0",
             "8.5": ""
         },
-        "source": "https://pecl.php.net/get/msgpack"
+        "source": "https://github.com/OSPanel/msgpack-php"
     },
     "mysqlnd_azure":
     {
@@ -1054,22 +1054,6 @@
             "8.5": ""
         },
         "source": "https://pecl.php.net/get/redis"
-    },
-    "rrd":
-    {
-        "ver":
-        {
-            "7.2": "",
-            "7.3": "",
-            "7.4": "",
-            "8.0": "2.0.3",
-            "8.1": "2.0.3",
-            "8.2": "2.0.3",
-            "8.3": "2.0.3",
-            "8.4": "2.0.3",
-            "8.5": ""
-        },
-        "source": "https://pecl.php.net/get/rrd"
     },
     "SeasLog":
     {
