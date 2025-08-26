@@ -106,7 +106,6 @@
         "ps": "PostScript document generation",
         "rar": "RAR archive file support",
         "rdkafka": "Apache Kafka message broker client",
-        "rrd": "Round Robin Database manipulation",
         "scoutapm": "Scout application performance monitoring",
         "seaslog": "High-performance logging library",
         "shmop": "Shared memory operations",
