@@ -63,7 +63,7 @@ if ($ExtensionName -eq 'iniparse' -and $PhpVersions -eq 'all') {
             $iniBuffer += ""
 
             # Запуск phpinfo с обязательными базовыми расширениями
-            $baseExt = @("mbstring", "apcu", "igbinary", "msgpack", "openssl", "sockets", "psr")
+            $baseExt = @("mbstring", "apcu", "igbinary", "msgpack", "brotli", "lz4", "lzf", "openssl", "sockets", "psr")
             $extArgs = @()
             foreach ($b in $baseExt + $extBase) {
                 if ($b -in @("opcache", "xdebug")) {
@@ -813,7 +813,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             # --- Конфигурация ---
 
             # Обязательные расширения
-            $mandatoryList = @("mbstring", "openssl", "apcu", "igbinary", "msgpack", "sockets", "psr", "curl")
+            $mandatoryList = @("mbstring", "openssl", "apcu", "igbinary", "msgpack", "brotli", "lz4", "lzf", "sockets", "psr", "curl")
 
             # Часто используемые (включенные)
             $commonList = @(
