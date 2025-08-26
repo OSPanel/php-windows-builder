@@ -42,21 +42,33 @@ Function Invoke-Build {
                 }
             }
             
-            if ($Config.name -match 'http') {
-                if (Test-Path "..\raphf\x64\Release\php_raphf.lib") {
-                    Copy-Item "..\raphf\x64\Release\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
-                }
-                if (Test-Path "..\raphf\x64\Release_TS\php_raphf.lib") {
-                    Copy-Item "..\raphf\x64\Release_TS\php_raphf.lib" "..\php-dev\lib\php_raphf.lib" -Force
-                }
-            }
-
-            if ($Config.name -match 'memcached') {
+            if ($Config.name -match 'memcached|phpredis|redis') {
                 if (Test-Path "..\msgpack\x64\Release\php_msgpack.lib") {
                     Copy-Item "..\msgpack\x64\Release\php_msgpack.lib" "..\php-dev\lib\php_msgpack.lib" -Force
                 }
                 if (Test-Path "..\msgpack\x64\Release_TS\php_msgpack.lib") {
                     Copy-Item "..\msgpack\x64\Release_TS\php_msgpack.lib" "..\php-dev\lib\php_msgpack.lib" -Force
+                }
+            }
+
+            if ($Config.name -match 'phpredis|redis') {
+                if (Test-Path "..\zstd\x64\Release\php_zstd.lib") {
+                    Copy-Item "..\zstd\x64\Release\php_msgpack.lib" "..\php-dev\lib\php_zstd.lib" -Force
+                }
+                if (Test-Path "..\zstd\x64\Release_TS\php_zstd.lib") {
+                    Copy-Item "..\zstd\x64\Release_TS\php_zstd.lib" "..\php-dev\lib\php_zstd.lib" -Force
+                }
+                if (Test-Path "..\lzf\x64\Release\php_lzf.lib") {
+                    Copy-Item "..\lzf\x64\Release\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
+                }
+                if (Test-Path "..\lzf\x64\Release_TS\php_lzf.lib") {
+                    Copy-Item "..\lzf\x64\Release_TS\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
+                }
+                if (Test-Path "..\lz4\x64\Release\php_lz4.lib") {
+                    Copy-Item "..\lz4\x64\Release\php_lz4.lib" "..\php-dev\lib\php_lz4.lib" -Force
+                }
+                if (Test-Path "..\lz4\x64\Release_TS\php_lz4.lib") {
+                    Copy-Item "..\lz4\x64\Release_TS\php_lz4.lib" "..\php-dev\lib\php_lz4.lib" -Force
                 }
             }
 
