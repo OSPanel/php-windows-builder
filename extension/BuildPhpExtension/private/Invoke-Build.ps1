@@ -52,23 +52,11 @@ Function Invoke-Build {
             }
 
             if ($Config.name -match 'phpredis|redis') {
-                if (Test-Path "..\zstd\x64\Release\php_zstd.lib") {
-                    Copy-Item "..\zstd\x64\Release\php_zstd.lib" "..\php-dev\lib\php_zstd.lib" -Force
-                }
-                if (Test-Path "..\zstd\x64\Release_TS\php_zstd.lib") {
-                    Copy-Item "..\zstd\x64\Release_TS\php_zstd.lib" "..\php-dev\lib\php_zstd.lib" -Force
-                }
                 if (Test-Path "..\lzf\x64\Release\php_lzf.lib") {
                     Copy-Item "..\lzf\x64\Release\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
                 }
                 if (Test-Path "..\lzf\x64\Release_TS\php_lzf.lib") {
                     Copy-Item "..\lzf\x64\Release_TS\php_lzf.lib" "..\php-dev\lib\php_lzf.lib" -Force
-                }
-                if (Test-Path "..\lz4\x64\Release\php_lz4.lib") {
-                    Copy-Item "..\lz4\x64\Release\php_lz4.lib" "..\php-dev\lib\php_lz4.lib" -Force
-                }
-                if (Test-Path "..\lz4\x64\Release_TS\php_lz4.lib") {
-                    Copy-Item "..\lz4\x64\Release_TS\php_lz4.lib" "..\php-dev\lib\php_lz4.lib" -Force
                 }
             }
 
