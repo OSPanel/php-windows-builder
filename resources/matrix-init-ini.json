@@ -261,14 +261,14 @@
             "use": true,
             "php_versions":
             {
-                "7.2": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "7.3": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "7.4": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "8.0": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "8.1": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "8.2": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "8.3": "\"{root_dir}/modules/{module_name}/PHP/ext\"",
-                "8.4": "\"{root_dir}/modules/{module_name}/PHP/ext\""
+                "7.2": "\"{root_dir}/modules/{module_name}/ext\"",
+                "7.3": "\"{root_dir}/modules/{module_name}/ext\"",
+                "7.4": "\"{root_dir}/modules/{module_name}/ext\"",
+                "8.0": "\"{root_dir}/modules/{module_name}/ext\"",
+                "8.1": "\"{root_dir}/modules/{module_name}/ext\"",
+                "8.2": "\"{root_dir}/modules/{module_name}/ext\"",
+                "8.3": "\"{root_dir}/modules/{module_name}/ext\"",
+                "8.4": "\"{root_dir}/modules/{module_name}/ext\""
             }
         },
         {
