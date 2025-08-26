@@ -430,6 +430,7 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
     # перебор только подпапок php-*
     Get-ChildItem $base -Directory -Filter 'php-*' | ForEach-Object {
         $dir = $_.FullName
+        $phpVersion = $_.Name
 
         $pre  = Join-Path $dir 'pre-ini.ini'
         $ext  = Join-Path $dir 'ext.ini'
@@ -441,6 +442,28 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
 
             "[PHP]", "", (Get-Content $pre), (Get-Content $ext), "", ";---------------------------------------", "; Extensions settings", ";---------------------------------------", "",(Get-Content $php) |
                 Set-Content $out -Encoding UTF8
+
+            # Удаляем исходные файлы
+            Write-Host "🗑️ Удаляю исходные файлы..."
+            Remove-Item $pre -Force
+            Remove-Item $ext -Force
+            Remove-Item $php -Force
+
+            # Формируем путь назначения
+            $destinationPath = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\default\templates\php2.ini"
+            $destinationDir = Split-Path $destinationPath -Parent
+
+            # Создаем папку назначения если её нет
+            if (-not (Test-Path $destinationDir)) {
+                Write-Host "📁 Создаю папку $destinationDir"
+                New-Item -ItemType Directory -Path $destinationDir -Force
+            }
+
+            # Перемещаем php.ini.merged
+            Write-Host "📋 Перемещаю php.ini.merged в $destinationPath"
+            Move-Item $out $destinationPath -Force
+
+            Write-Host "✅ Обработка $phpVersion завершена" -ForegroundColor Green
         }
         else {
             Write-Host "⚠️ В папке $dir не хватает одного из файлов (pre-ini.ini, ext.ini, php.ini)" -ForegroundColor Yellow
@@ -722,6 +745,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
         Write-Host "🔧 Постобработка: $($_.Name)"
 
         # 2. Копируем прочие util-файлы из bin\
+
         $tools = @("openssl.exe", "tidy.exe")
         foreach ($tool in $tools) {
             $src = Join-Path $phpFolder "bin\$tool"
@@ -730,6 +754,21 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
                 Copy-Item -Path $src -Destination $dst -Force
                 Write-Host "📥 Скопирован: $tool"
             }
+        }
+
+        # 3. Копируем SASL2 плагин
+        $saslSrc = Join-Path $phpFolder "bin\sasl2\plugin_sasldb.dll"
+        if (Test-Path $saslSrc) {
+            $saslDir = Join-Path $phpFolder "sasl2"
+            $saslDst = Join-Path $saslDir "plugin_sasldb.dll"
+
+            # Создаем папку sasl2 если она не существует
+            if (-not (Test-Path $saslDir)) {
+                New-Item -ItemType Directory -Path $saslDir -Force | Out-Null
+            }
+
+            Copy-Item -Path $saslSrc -Destination $saslDst -Force
+            Write-Host "📥 Скопирован: sasl2\plugin_sasldb.dll"
         }
 
         # 3. Удаляем папку bin полностью
@@ -831,10 +870,10 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
 
             # Часто используемые (включенные)
             $commonList = @(
-                "brotli", "bz2", "crypto", "enchant", "exif", "fileinfo", "ftp", "gd", "gd2",
-                "gettext", "gmp", "hrtime","imap", "intl", "lz4", "lzf", "mailparse", "mcrypt", "memcache",
+                "bz2", "crypto", "enchant", "exif", "fileinfo", "ftp", "gd", "gd2",
+                "gettext", "gmp", "hrtime","imap", "intl", "mailparse", "mcrypt", "memcache",
                 "memcached", "mysqli", "odbc", "pdo_mysql", "pdo_sqlite", "redis", "scrypt",
-                "soap", "sodium", "sqlite3", "timezonedb", "xmlrpc", "xsl", "yaml", "zip", "zstd"
+                "soap", "sodium", "sqlite3", "timezonedb", "xmlrpc", "xsl", "yaml", "zip"
             )
 
             # Zend расширения
