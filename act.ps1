@@ -813,7 +813,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             # --- Конфигурация ---
 
             # Обязательные расширения
-            $mandatoryList = @("mbstring", "openssl", "apcu", "igbinary", "msgpack", "brotli", "lz4", "lzf", "sockets", "psr", "curl")
+            $mandatoryList = @("mbstring", "openssl", "apcu", "igbinary", "msgpack", "brotli", "lz4", "lzf", "zstd", "sockets", "psr", "curl")
 
             # Часто используемые (включенные)
             $commonList = @(
