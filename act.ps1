@@ -447,7 +447,7 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
         }
     }
 
-    Write-Host "✅ Готово. НЕ ЗАБУДЬ про плагин sasl mongo." -ForegroundColor Green
+    Write-Host "✅ Готово." -ForegroundColor Green
     exit 0
 }
 
@@ -566,11 +566,25 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             Write-Host "⚠️ Папка bin не найдена в: $($folder.FullName)"
         }
 
-        # Удаляем подпапку sasl2 внутри bin, если она существует
+        # Удаляем содержимое подпапки sasl2 внутри bin, кроме plugin_sasldb.dll
         $sasl2Path = Join-Path $binPath "sasl2"
         if (Test-Path $sasl2Path) {
-            Remove-Item -Path $sasl2Path -Recurse -Force
-            Write-Host "🗑️ Удалена папка: $sasl2Path"
+            $pluginSasldbPath = Join-Path $sasl2Path "plugin_sasldb.dll"
+
+            # Получаем все элементы в папке sasl2
+            $items = Get-ChildItem -Path $sasl2Path -Force
+
+            foreach ($item in $items) {
+                # Пропускаем plugin_sasldb.dll
+                if ($item.FullName -ne $pluginSasldbPath) {
+                    Remove-Item -Path $item.FullName -Recurse -Force
+                    Write-Host "🗑️ Удален: $($item.Name)"
+                } else {
+                    Write-Host "✅ Сохранен: $($item.Name)"
+                }
+            }
+
+            Write-Host "🗑️ Очищена папка sasl2, кроме plugin_sasldb.dll"
         } else {
             Write-Host "⚠️ Папка sasl2 не найдена в: $binPath"
         }
