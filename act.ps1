@@ -824,15 +824,15 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             )
 
             # Zend расширения
-            $zendList = @("opcache", "xdebug")
+            $zendList = @("opcache", "xdebug", "scoutapm")
 
             # --- Формируем файл ---
             $iniLines = @()
 
             # Шапка
             $iniLines += ";---------------------------------------"
-            $iniLines += "; Расширения"
-            $iniLines += "; Не изменяйте порядок расширений в конфиге!"
+            $iniLines += "; Extensions"
+            $iniLines += "; Do not change the order of extensions in the config!"
             $iniLines += ";---------------------------------------"
             $iniLines += ""
 
@@ -846,8 +846,8 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             $foundMandatory = $mandatoryList | Where-Object { $extNames -contains $_ }
 
             if ($foundMandatory.Count -gt 0) {
-                $iniLines += "; Обязательные расширения"
-                $iniLines += "; Никогда не отключайте эти расширения!"
+                $iniLines += "; Mandatory extensions"
+                $iniLines += "; Never disable these extensions!"
                 $iniLines += ""
 
                 foreach ($ext in $foundMandatory) {
@@ -861,7 +861,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             $foundCommon = $commonList | Where-Object { $extNames -contains $_ } | Sort-Object
 
             if ($foundCommon.Count -gt 0) {
-                $iniLines += "; Часто используемые расширения"
+                $iniLines += "; Commonly used extensions"
                 $iniLines += ""
 
                 foreach ($ext in $foundCommon) {
@@ -876,7 +876,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             $foundOptional = $extNames | Where-Object { $_ -notin $usedExtensions } | Sort-Object
 
             if ($foundOptional.Count -gt 0) {
-                $iniLines += "; Опциональные / закомментированные расширения"
+                $iniLines += "; Optional / commented extensions"
                 $iniLines += ""
 
                 foreach ($ext in $foundOptional) {
@@ -890,7 +890,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             $foundZend = $zendList | Where-Object { $extNames -contains $_ } | Sort-Object
 
             if ($foundZend.Count -gt 0) {
-                $iniLines += "; Zend расширения"
+                $iniLines += "; Zend extensions"
                 $iniLines += ""
 
                 foreach ($ext in $foundZend) {
