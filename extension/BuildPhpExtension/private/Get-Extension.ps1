@@ -100,7 +100,7 @@ function Get-Extension {
 
                         git checkout FETCH_HEAD > $null 2>&1
 
-                        $targetExtensions = @("ddtrace", "lz4", "phpredis", "redis")
+                        $targetExtensions = @("ddtrace", "lz4", "phpredis", "redis", "brotli")
                         if ($targetExtensions | Where-Object { $Extension.Contains($_) }) {
                             git submodule update --init --recursive > $null 2>&1
                         }
