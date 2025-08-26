@@ -3,9 +3,7 @@
     {
         "ext-apcu": "*",
         "ext-igbinary": "*",
-        "ext-msgpack": "*",
-        "ext-lzf": "*",
-        "zlib": "*"
+        "ext-msgpack": "*"
     },
     "php-ext":
     {
