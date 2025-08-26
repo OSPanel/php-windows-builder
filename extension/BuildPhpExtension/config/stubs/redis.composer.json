@@ -3,13 +3,19 @@
     {
         "ext-apcu": "*",
         "ext-igbinary": "*",
-        "ext-msgpack": "*"
+        "ext-msgpack": "*",
+        "ext-zstd": "*",
+        "ext-lzf": "*",
+        "ext-lz4": "*"
     },
     "php-ext":
     {
         "configure-options": [
         {
             "name": "enable-redis"
+        },
+        {
+            "name": "enable-redis-session"
         },
         {
             "name": "enable-redis-igbinary"
