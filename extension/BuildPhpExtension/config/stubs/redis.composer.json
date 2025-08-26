@@ -4,10 +4,8 @@
         "ext-apcu": "*",
         "ext-igbinary": "*",
         "ext-msgpack": "*",
-        "ext-zstd": "*",
         "ext-lzf": "*",
-        "zlib": "*",
-        "libzstd": "*"
+        "zlib": "*"
     },
     "php-ext":
     {
