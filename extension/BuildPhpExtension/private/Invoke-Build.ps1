@@ -42,7 +42,7 @@ Function Invoke-Build {
                 }
             }
             
-            if ($Config.name -match 'memcached|phpredis|redis') {
+            if ($Config.name -match 'memcached') {
                 if (Test-Path "..\msgpack\x64\Release\php_msgpack.lib") {
                     Copy-Item "..\msgpack\x64\Release\php_msgpack.lib" "..\php-dev\lib\php_msgpack.lib" -Force
                 }
