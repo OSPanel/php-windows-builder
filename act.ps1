@@ -491,8 +491,27 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
             Remove-Item $ext -Force
             Remove-Item $php -Force
 
+            # Получаем новую версию из php.exe
+            $phpExe   = Join-Path $dir 'php.exe'
+            $phpVersionz = (& $phpExe -v)[0] -replace '^PHP ([\d\.]+).*','$1'
+
+            # Путь к ini‑файлу
+            $iniFile = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\module.ini"
+
+            # Читаем весь файл как единую строку
+            $content = Get-Content $iniFile -Raw
+
+            # Заменяем только число после version =
+            # ^(\s*version\s*=\s*)  -> вся часть до значения
+            # [\d\.]+               -> старый номер версии
+            # $1$phpVersion         -> оставляем всё как было + новая версия
+            $newContent = $content -replace '(^\s*version\s*=\s*)[\d\.]+', "`$1$phpVersionz"
+
+            # Перезаписываем файл
+            Set-Content $iniFile $newContent -Encoding UTF8
+
             # Формируем путь назначения
-            $destinationPath = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\default\templates\php2.ini"
+            $destinationPath = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\default\templates\php.ini"
             $destinationDir = Split-Path $destinationPath -Parent
 
             # Создаем папку назначения если её нет
