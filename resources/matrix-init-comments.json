@@ -92,7 +92,7 @@
         "smtp_port": "SMTP server port for Windows mail() (default 25).",
         "disable_classes": "Comma-separated list of classes to disable.",
         "disable_functions": "Comma-separated list of functions to disable (e.g., exec, system).",
-        "open_basedir": "Restrict file operations to specified directory tree(s); semicolon/colon separated.",
+        "open_basedir": "Restrict file operations to specified directory tree(s); semicolon separated.",
         "syslog.facility": "Syslog facility to use (e.g., LOG_USER, LOG_MAIL, LOG_LOCAL0..7).",
         "syslog.filter": "Syslog filter mode (e.g., no-ctrl to remove control chars).",
         "syslog.ident": "Syslog ident string (tag) used for log entries.",
