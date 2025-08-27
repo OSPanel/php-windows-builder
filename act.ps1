@@ -218,8 +218,8 @@ if ($ExtensionName -eq 'iniparse' -and $PhpVersions -eq 'all') {
 
 if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
     # --- НАСТРОЙКИ ДЛЯ ВСТАВКИ ---
-    $MatrixFile      = ".\resources\matrix-ini.json"
-    $CommentsFile    = ".\resources\matrix-comments.json"
+    $MatrixFile      = "C:\Portable\Documents\Git\OSPanel\resources\matrix\matrix-ini.json"
+    $CommentsFile    = "C:\Portable\Documents\Git\OSPanel\resources\matrix\matrix-ini-comments.json"
     $OutputRoot      = ".\data"
     $PhpFolderPrefix = "php-"
     # -----------------------------
@@ -346,8 +346,8 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
     }
 
     # --- НАСТРОЙКИ ДЛЯ ВСТАВКИ ---
-    $MatrixFile      = ".\resources\matrix-init-ini.json"
-    $CommentsFile    = ".\resources\matrix-init-comments.json"
+    $MatrixFile      = "C:\Portable\Documents\Git\OSPanel\resources\matrix\matrix-init.json"
+    $CommentsFile    = "C:\Portable\Documents\Git\OSPanel\resources\matrix\matrix-init-comments.json"
     $OutputRoot      = ".\data"
     $PhpFolderPrefix = "php-"
     # -----------------------------
@@ -886,7 +886,7 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
             }
 
             # --- Загрузка комментариев ---
-            $commentsPath = Join-Path $PSScriptRoot "resources\ext-comments.json"
+            $commentsPath = "C:\Portable\Documents\Git\OSPanel\resources\matrix\matrix-ext-comments.json"
             $comments = @{}
 
             if (Test-Path $commentsPath) {
@@ -897,14 +897,14 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
                             $comments[$_.Name] = $_.Value
                         }
                     }
-                    Write-Host "✅ Загружены комментарии из ext-comments.json ($($comments.Count) расширений)"
+                    Write-Host "✅ Загружены комментарии из matrix-ext-comments.json ($($comments.Count) расширений)"
                 }
                 catch {
-                    Write-Host "⚠️ Ошибка загрузки ext-comments.json: $($_.Exception.Message)"
+                    Write-Host "⚠️ Ошибка загрузки matrix-ext-comments.json: $($_.Exception.Message)"
                 }
             }
             else {
-                Write-Host "⚠️ Файл ext-comments.json не найден"
+                Write-Host "⚠️ Файл matrix-ext-comments.json не найден"
             }
 
             # Функция для форматирования строки
