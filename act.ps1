@@ -471,64 +471,78 @@ if ($ExtensionName -eq 'ini' -and $PhpVersions -eq 'all') {
 
     # перебор только подпапок php-*
     Get-ChildItem $base -Directory -Filter 'php-*' | ForEach-Object {
-        $dir = $_.FullName
-        $phpVersion = $_.Name
+    $dir = $_.FullName
+    $phpVersion = $_.Name
 
-        $pre  = Join-Path $dir 'pre-ini.ini'
-        $ext  = Join-Path $dir 'ext.ini'
-        $php  = Join-Path $dir 'php.ini'
-        $out  = Join-Path $dir 'php.ini.merged'
+    $pre  = Join-Path $dir 'pre-ini.ini'
+    $ext  = Join-Path $dir 'ext.ini'
+    $php  = Join-Path $dir 'php.ini'
+    $out  = Join-Path $dir 'php.ini.merged'
 
-        if ((Test-Path $pre) -and (Test-Path $ext) -and (Test-Path $php)) {
-            Write-Host "🔧 Собираю $out"
+    if ((Test-Path $pre) -and (Test-Path $ext) -and (Test-Path $php)) {
+        Write-Host "🔧 Собираю $out"
 
-            "[PHP]", "", (Get-Content $pre), (Get-Content $ext), "", ";---------------------------------------", "; Extensions settings", ";---------------------------------------", "",(Get-Content $php) |
-                Set-Content $out -Encoding UTF8
+        "[PHP]", "", (Get-Content $pre), (Get-Content $ext), "", ";---------------------------------------", "; Extensions settings", ";---------------------------------------", "",(Get-Content $php) |
+            Set-Content $out -Encoding UTF8
 
-            # Удаляем исходные файлы
-            Write-Host "🗑️ Удаляю исходные файлы..."
-            Remove-Item $pre -Force
-            Remove-Item $ext -Force
-            Remove-Item $php -Force
+        # Удаляем исходные файлы
+        Write-Host "🗑️ Удаляю исходные файлы..."
+        Remove-Item $pre -Force
+        Remove-Item $ext -Force
+        Remove-Item $php -Force
 
-            # Получаем новую версию из php.exe
-            $phpExe   = Join-Path $dir 'php.exe'
-            $phpVersionz = (& $phpExe -v)[0] -replace '^PHP ([\d\.]+).*','$1'
+        # Получаем новую версию из php.exe
+        $phpExe   = Join-Path $dir 'php.exe'
+        $phpVersionz = (& $phpExe -v)[0] -replace '^PHP ([\d\.]+).*','$1'
 
-            # Путь к ini‑файлу
-            $iniFile = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\module.ini"
+        # Путь к модулю OSPanel
+        $osModulePath = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion"
+        $osDataPath = Join-Path $osModulePath 'ospanel_data'
 
-            # Читаем весь файл как единую строку
-            $content = Get-Content $iniFile -Raw
-
-            # Заменяем только число после version =
-            # ^(\s*version\s*=\s*)  -> вся часть до значения
-            # [\d\.]+               -> старый номер версии
-            # $1$phpVersion         -> оставляем всё как было + новая версия
-            $newContent = $content -replace '(^\s*version\s*=\s*)[\d\.]+', "`$1$phpVersionz"
-
-            # Перезаписываем файл
-            Set-Content $iniFile $newContent -Encoding UTF8
-
-            # Формируем путь назначения
-            $destinationPath = "C:\Portable\Documents\Git\OSPanel\modules\$phpVersion\ospanel_data\default\templates\php.ini"
-            $destinationDir = Split-Path $destinationPath -Parent
-
-            # Создаем папку назначения если её нет
-            if (-not (Test-Path $destinationDir)) {
-                Write-Host "📁 Создаю папку $destinationDir"
-                New-Item -ItemType Directory -Path $destinationDir -Force
-            }
-
-            # Перемещаем php.ini.merged
-            Write-Host "📋 Перемещаю php.ini.merged в $destinationPath"
-            Move-Item $out $destinationPath -Force
-
-            Write-Host "✅ Обработка $phpVersion завершена" -ForegroundColor Green
+        # Удаляем всё содержимое модуля кроме ospanel_data
+        if (Test-Path $osModulePath) {
+            Write-Host "🗑️ Очищаю содержимое $osModulePath (кроме ospanel_data)..."
+            Get-ChildItem $osModulePath | Where-Object { $_.Name -ne 'ospanel_data' } | Remove-Item -Recurse -Force
         }
-        else {
-            Write-Host "⚠️ В папке $dir не хватает одного из файлов (pre-ini.ini, ext.ini, php.ini)" -ForegroundColor Yellow
+
+        # Копируем содержимое из исходной папки
+        Write-Host "📋 Копирую содержимое из $dir в $osModulePath"
+        Copy-Item "$dir\*" $osModulePath -Recurse -Force
+
+        # Путь к ini‑файлу
+        $iniFile = Join-Path $osDataPath 'module.dat'
+
+        # Читаем весь файл как единую строку
+        $content = Get-Content $iniFile -Raw
+
+        # Заменяем только число после version =
+        # ^(\s*version\s*=\s*)  -> вся часть до значения
+        # [\d\.]+               -> старый номер версии
+        # $1$phpVersion         -> оставляем всё как было + новая версия
+        $newContent = $content -replace '(\bversion\s*=\s*)[\d\.]+' , { 'version                 = ' + $phpVersionz }
+
+        # Перезаписываем файл
+        Set-Content $iniFile $newContent -Encoding UTF8
+
+        # Формируем путь назначения
+        $destinationPath = Join-Path $osDataPath 'default\templates\php.ini'
+        $destinationDir = Split-Path $destinationPath -Parent
+
+        # Создаем папку назначения если её нет
+        if (-not (Test-Path $destinationDir)) {
+            Write-Host "📁 Создаю папку $destinationDir"
+            New-Item -ItemType Directory -Path $destinationDir -Force
         }
+
+        # Перемещаем php.ini.merged
+        Write-Host "📋 Перемещаю php.ini.merged в $destinationPath"
+        Move-Item $out $destinationPath -Force
+
+        Write-Host "✅ Обработка $phpVersion завершена" -ForegroundColor Green
+    }
+    else {
+        Write-Host "⚠️ В папке $dir не хватает одного из файлов (pre-ini.ini, ext.ini, php.ini)" -ForegroundColor Yellow
+    }
     }
 
     Write-Host "✅ Готово." -ForegroundColor Green
