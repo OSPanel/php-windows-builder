@@ -106,7 +106,7 @@
         "browscap": "Path to browscap.ini for user agent capability detection.",
         "cli_server.color": "Colorize CLI built-in webserver output (On/Off).",
         "fiber.stack_size": "Default stack size for Fibers in bytes (empty = engine default).",
-        "from": "Default email address for mail-related contexts and HTTP From header.",
+        "from": "Define the anonymous ftp password (your email address)",
         "highlight.comment": "Syntax highlight color for comments (HTML color).",
         "highlight.default": "Syntax highlight color for default text (HTML color).",
         "highlight.html": "Syntax highlight color for HTML (HTML color).",
