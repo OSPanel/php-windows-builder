@@ -3,6 +3,48 @@ param(
     [string]$PhpVersions = ""
 )
 
+
+<#$repo  = "OSPanel/php-windows-builder"
+$limit = 5000
+$tempDir = Join-Path $env:TEMP "gh-run-logs"
+if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+New-Item -ItemType Directory -Path $tempDir | Out-Null
+
+# Токен для API
+$token = gh auth token
+
+# Получаем последние workflow-runs
+$runs = gh run list --repo $repo --limit $limit --json databaseId,displayTitle | ConvertFrom-Json
+
+foreach ($run in $runs) {
+    $runId    = $run.databaseId
+    $runTitle = $run.displayTitle
+
+    $zipPath  = Join-Path $tempDir "$runId.zip"
+    $extract  = Join-Path $tempDir "$runId"
+
+    try {
+        # Скачиваем архив логов API вызовом
+        Invoke-WebRequest `
+            -Uri "https://api.github.com/repos/$repo/actions/runs/$runId/logs" `
+            -Headers @{ Authorization = "Bearer $token"; "Accept" = "application/vnd.github+json" } `
+            -OutFile $zipPath
+
+        Expand-Archive -Path $zipPath -DestinationPath $extract -Force
+
+        $txtFiles = Get-ChildItem $extract -Recurse -Filter *.txt
+        foreach ($txt in $txtFiles) {
+            if (Select-String -Path $txt.FullName -Pattern "msgpack" -Quiet) {
+                Write-Host "Найдено 'msgpack' → Workflow: $runTitle | JobLogFile: $($txt.Name)" -ForegroundColor Green
+            }
+        }
+    }
+    catch {
+        Write-Warning "Не удалось скачать/распаковать логи для run $runTitle ($runId)"
+    }
+}#>
+
+
 if ($ExtensionName -eq 'iniparse' -and $PhpVersions -eq 'all') {
     Set-Location data
     $logFile = Join-Path (Get-Location) "scan.log"
