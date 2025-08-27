@@ -122,7 +122,7 @@ jobs:
           cd /tmp || exit 1
           zip -r $extension-${{ inputs.extension-ref }}.zip $extension
           if ! gh release view pecl -R ${{ github.repository }}; then
-            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t pecl -n pecl -R ${{ github.repository }}
+            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t "PECL ${{ inputs.extension-ref }}" -n "Release of PECL extension '$extension', version ${{ inputs.extension-ref }}" -R ${{ github.repository }}
           else
             gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
           fi
