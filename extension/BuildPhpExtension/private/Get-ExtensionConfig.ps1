@@ -92,7 +92,11 @@ Function Get-ExtensionConfig {
             }
             if($null -ne $composerJson -and $null -ne $composerJson."php-ext" -and $null -ne $composerJson."php-ext"."configure-options") {
                 $composerJson."php-ext"."configure-options" | ForEach-Object {
-                    $config.options += "--$( $_.name )"
+                    if($null -ne $_."needs-value" -and $_."needs-value" -eq $true -and $_.name -eq "with-$($Extension.ToLower())") {
+                        $config.options += "--$($_.name)=shared"
+                    } else {
+                        $config.options += "--$( $_.name )"
+                    }
                 }
             }
             $config.options = $config.options -join " "
@@ -224,7 +228,7 @@ Function Get-ExtensionConfig {
             }
 
             # TODO: This should be implemented using composer.json once implemented
-            $packageXml = Get-ChildItem (Get-Location).Path -Filter "package.xml" -ErrorAction SilentlyContinue
+            $packageXml = Get-ChildItem (Get-Location).Path -Filter "package.xml" -ErrorAction SilentlyContinue | Select-Object -First 1
             if($null -ne $packageXml) {
                 $xml = [xml](Get-Content $packageXml.FullName)
                 $config.docs = $xml.SelectNodes("//*[@role='doc']") | ForEach-Object {
