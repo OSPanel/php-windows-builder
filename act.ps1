@@ -630,15 +630,6 @@ if ($ExtensionName -eq 'extract' -and $PhpVersions -eq 'all') {
         }
     }
 
-    # Копируем содержимое подпапки php_bundle из php в текущую папку
-    $bundleSource = Join-Path -Path $dataDir -ChildPath "php_bundle"
-    if (Test-Path -Path $bundleSource) {
-        Copy-Item -Path "$bundleSource\*" -Destination (Get-Location) -Recurse -Force
-        Write-Host "📁 Копирование содержимого 'php_bundle' завершено."
-    } else {
-        Write-Host "⚠️ Папка 'php_bundle' не найдена."
-    }
-
     # Получаем все папки, начинающиеся на 'php-' в текущей директории
     $phpFolders = Get-ChildItem -Path . -Directory -Filter "php-*"
 
@@ -1217,7 +1208,7 @@ foreach ($extVersion in $extGroups.Keys) {
         -f extension-ref="$extVersion" `
         -f php-version-list="$phpVersions" `
         -f arch-list="x64" `
-        -f ts-list="nts"
+        -f ts-list="nts,ts"
 
     Write-Host ""
 }
