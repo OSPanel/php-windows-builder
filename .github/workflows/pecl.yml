@@ -106,13 +106,13 @@ jobs:
           ts="${{ matrix.ts }}"
           ref="${{ inputs.extension-ref }}"
           
-          # Имя артефакта соответствует тому, что создается в extension job (с префиксом php_)
-          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-vs16-${arch}"
+          # Artifact name matches what's created in extension job (with .zip extension)
+          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-vs16-${arch}.zip"
           
-          # Имя файла для релиза БЕЗ префикса php_
+          # Release filename WITHOUT php_ prefix
           release_filename="${extension}-${ref}-php-${php_version}-${ts}-vs16-${arch}.zip"
           
-          # Получаем ID артефакта и скачиваем как zip
+          # Get artifact ID and download as zip
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
           
           if [ -z "$artifact_id" ]; then
@@ -125,10 +125,10 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
             -o "${release_filename}"
           
-          # Релиз по версии расширения
+          # Release by extension version
           release_tag="${extension}-${ref}"
           
-          # Создаем или обновляем релиз
+          # Create or update release
           if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
             gh release create "${release_tag}" "${release_filename}" \
               -t "${extension} ${ref}" \
