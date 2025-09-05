@@ -106,11 +106,19 @@ jobs:
           ts="${{ matrix.ts }}"
           ref="${{ inputs.extension-ref }}"
           
+          # Determine VS version based on PHP version
+          case "$php_version" in
+            7.2|7.3|7.4) vs_version="vs15" ;;
+            8.0|8.1|8.2|8.3) vs_version="vs16" ;;
+            8.4|8.5) vs_version="vs17" ;;
+            *) vs_version="vs16" ;; # default fallback
+          esac
+          
           # Artifact name matches what's created in extension job (with .zip extension)
-          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-vs16-${arch}.zip"
+          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
           
           # Release filename WITHOUT php_ prefix
-          release_filename="${extension}-${ref}-php-${php_version}-${ts}-vs16-${arch}.zip"
+          release_filename="${extension}-${ref}-php-${php_version}-${ts}-${vs_version}-${arch}.zip"
           
           # Get artifact ID and download as zip
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
