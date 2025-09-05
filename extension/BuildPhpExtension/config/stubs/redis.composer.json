@@ -1,15 +1,20 @@
 {
-  "php-ext": {
-    "configure-options": [
-      {
-        "name": "enable-redis"
-      },
-      {
-        "name": "enable-redis-session"
-      },
-      {
-        "name": "disable-redis-igbinary"
-      }
-    ]
-  }
+    "require":
+    {
+        "ext-apcu": "*",
+        "ext-igbinary": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-redis"
+        },
+        {
+            "name": "enable-redis-session"
+        },
+        {
+            "name": "enable-redis-igbinary"
+        }]
+    }
 }

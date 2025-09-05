@@ -1,0 +1,14 @@
+{
+    "require":
+    {
+        "ext-apcu": "*",
+        "libzstd": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-zstd"
+        }]
+    }
+}

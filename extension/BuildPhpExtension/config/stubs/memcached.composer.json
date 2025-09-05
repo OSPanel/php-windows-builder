@@ -1,0 +1,38 @@
+{
+    "require":
+    {
+        "ext-apcu": "*",
+        "ext-igbinary": "*",
+        "ext-msgpack": "*",
+        "ext-lz4": "*",
+        "ext-lzf": "*",
+        "ext-zstd": "*",
+        "libsasl": "*",
+        "libzstd": "*",
+        "libsasl": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-memcached",
+            "description": "Enable memcached support"
+        },
+        {
+            "name": "enable-memcached-session",
+            "description": "Enable memcached session handler support"
+        },
+        {
+            "name": "enable-memcached-igbinary",
+            "description": "Enable memcached igbinary serializer support"
+        },
+        {
+            "name": "enable-memcached-json",
+            "description": "Enable memcached json serializer support"
+        },
+        {
+            "name": "enable-memcached-msgpack",
+            "description": "Enable memcached msgpack serializer support"
+        }]
+    }
+}

@@ -1,0 +1,15 @@
+{
+    "require":
+    {
+        "ext-apcu": "*",
+        "ext-igbinary": "*",
+        "ext-msgpack": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-yac"
+        }]
+    }
+}

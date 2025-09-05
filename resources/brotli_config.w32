@@ -1,0 +1,37 @@
+ARG_ENABLE("brotli", "enable brotli support", "yes");
+
+if (PHP_BROTLI != "no") {
+  if (MODE_PHPIZE) {
+    // PHPIZE
+    if (CHECK_HEADER_ADD_INCLUDE("ext/apcu/apc_serializer.h", "CFLAGS_ZSTD", PHP_DIR + "\\include")) {
+      AC_DEFINE("HAVE_APCU_SUPPORT", 1, "APCu support");
+    }
+  } else {
+    // in-tree build
+    if (get_define("HAVE_APCU")) {
+      AC_DEFINE("HAVE_APCU_SUPPORT", 1, "APCu support");
+    }
+  }
+  if (CHECK_LIB("brotlicommon.lib;libbrotlicommon.lib", "brotli", PHP_BROTLI) &&
+      CHECK_LIB("brotlidec.lib;libbrotlidec.lib", "brotli", PHP_BROTLI) &&
+      CHECK_LIB("brotlienc.lib;libbrotlienc.lib", "brotli", PHP_BROTLI) &&
+      CHECK_HEADER_ADD_INCLUDE("brotli/encode.h", "CFLAGS_BROTLI", PHP_BROTLI)) {
+    EXTENSION("brotli", "brotli.c", PHP_BROTLI_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+    if (CHECK_HEADER_ADD_INCLUDE("brotli/shared_dictionary.h", "CFLAGS_BROTLI", PHP_BROTLI)) {
+      // library version >= 1.1.0
+      AC_DEFINE('USE_BROTLI_DICTIONARY', 1, 'use dictionary support');
+    }
+  } else {
+    EXTENSION("brotli", "brotli.c", PHP_BROTLI_SHARED, "/DZEND_ENABLE_STATIC_TSRMLS_CACHE=1");
+    ADD_SOURCES("brotli/c/common", "constants.c context.c dictionary.c platform.c shared_dictionary.c transform.c", "brotli");
+    ADD_SOURCES("brotli/c/enc", "backward_references.c backward_references_hq.c bit_cost.c block_splitter.c brotli_bit_stream.c cluster.c command.c compound_dictionary.c compress_fragment.c compress_fragment_two_pass.c dictionary_hash.c encode.c encoder_dict.c entropy_encode.c fast_log.c histogram.c literal_cost.c memory.c metablock.c static_dict.c utf8_util.c", "brotli");
+    ADD_SOURCES("brotli/c/dec", "bit_reader.c decode.c huffman.c state.c", "brotli");
+
+    ADD_FLAG("CFLAGS_BROTLI", " /I" + configure_module_dirname + " /I" + configure_module_dirname + "/brotli/c/include");
+
+    AC_DEFINE('USE_BROTLI_BUNDLED', 1, 'use bundled');
+    AC_DEFINE('USE_BROTLI_DICTIONARY', 1, 'use dictionary support');
+  }
+  AC_DEFINE('BROTLI_MIN_VERSION', '0.6', 'libbrotlienc minimum version');
+  PHP_INSTALL_HEADERS("ext/brotli/", "php_brotli.h");
+}

@@ -2,7 +2,7 @@ Function Add-Extension {
     <#
     .SYNOPSIS
         Build a PHP extension.
-    .PAMAETER Extension
+    .PARAMETER Extension
         Extension name.
     .PARAMETER Config
         Configuration for the extension.
@@ -22,25 +22,31 @@ Function Add-Extension {
     }
     process {
         Set-GAGroup start
-        Get-File -Url "https://pecl.php.net/get/$Extension" -OutFile "$Extension.tgz"
         $currentDirectory = (Get-Location).Path
-        & tar -xzf "$Extension.tgz" -C $currentDirectory
-        Set-Location "$Extension-*"
-        $extensionBuildDirectory = Join-Path -Path (Get-Location).Path -ChildPath $config.build_directory
-        # Apply patches only for php/php-windows-builder and shivammathur/php-windows-builder
-        if($null -ne $env:GITHUB_REPOSITORY) {
-            if($env:GITHUB_REPOSITORY -eq 'php/php-windows-builder' -or $env:GITHUB_REPOSITORY -eq 'shivammathur/php-windows-builder') {
-                if(Test-Path -PATH $PSScriptRoot\..\patches\$Extension.ps1) {
-                    . $PSScriptRoot\..\patches\$Extension.ps1
-                }
-            }
+        $matrix = (Get-Content "$PSScriptRoot\..\config\matrix.json" -Raw | ConvertFrom-Json)
+        $extensionName, $extensionVersion = $Extension -split '-', 2
+        $url = $matrix.$extensionName.source
+        $ref = $extensionVersion
+        $local = ($null -eq $url -or $ref -eq '')
+        $source = @{
+            url   = $url
+            ref   = $ref
+            local = $local
         }
+        $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -BuildDirectory $currentDirectory -LocalSrc $source.local
+
         $configW32Content = [string](Get-Content -Path "config.w32")
         $argument = Get-ArgumentFromConfig $Extension $configW32Content
         $bat_content = @()
         $bat_content += ""
         $bat_content += "call phpize 2>&1"
-        $bat_content += "call configure --with-php-build=`"..\deps`" $argument --with-mp=`"disable`" --with-prefix=$Prefix 2>&1"
+        Write-Host "ARGUMENT: $argument"
+            if($Config.php_version -eq '7.2') {
+        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--with-prefix=$Prefix`" 2>&1"
+            } else {
+        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2`" `"--with-prefix=$Prefix`" 2>&1"
+            }
+
         $bat_content += "nmake /nologo 2>&1"
         $bat_content += "exit %errorlevel%"
         Set-Content -Encoding "ASCII" -Path $Extension-task.bat -Value $bat_content
@@ -58,10 +64,12 @@ Function Add-Extension {
         Write-Host (Get-Content "build-$suffix.txt" -Raw)
         $includePath = "$currentDirectory\php-dev\include"
         New-Item -Path $includePath\ext -Name $Extension -ItemType "directory" | Out-Null
-        Get-ChildItem -Path (Get-Location).Path -Recurse -Include '*.h', '*.c' | Copy-Item -Destination "$includePath\ext\$Extension"
+        # Get-ChildItem -Path (Get-Location).Path -Recurse -Include '*.h', '*.c' | Copy-Item -Destination "$includePath\ext\$Extension"
+        Copy-Item -Path (Join-Path (Get-Location).Path '*') -Destination "$includePath\ext\$Extension" -Recurse -Force
         Copy-Item -Path "$extensionBuildDirectory\*.dll" -Destination "$currentDirectory\php-bin\ext" -Force
         Copy-Item -Path "$extensionBuildDirectory\*.lib" -Destination "$currentDirectory\php-dev\lib" -Force
         Add-Content -Path "$currentDirectory\php-bin\php.ini" -Value "extension=$Extension"
+        if (-not (Test-Path "..\pecl\$Extension")) { New-Item -ItemType Directory -Path "..\pecl\$Extension" -Force | Out-Null }; Copy-Item ".\*" -Destination "..\pecl\$Extension" -Recurse -Force
         Set-Location $currentDirectory
         Set-GAGroup end
     }

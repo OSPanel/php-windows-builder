@@ -1,12 +1,13 @@
 {
-  "require": {
-    "ext-raphf": "*"
-  },
-  "php-ext": {
-    "configure-options": [
-      {
-        "name": "enable-http"
-      }
-    ]
-  }
+    "require":
+    {
+        "ext-raphf": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-http"
+        }]
+    }
 }

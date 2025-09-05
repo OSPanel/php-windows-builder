@@ -1,7 +1,3 @@
-# Caution: This workflow is internal to the php-windows-builder repository.
-# Do not copy this workflow to your repository.
-# Instead, refer to the workflows in the examples/ directory.
-
 name: Build PHP Extension From PECL
 run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
 on:
@@ -87,7 +83,7 @@ jobs:
           run-tests: ${{ inputs.run-tests }}
           test-runner: ${{ inputs.test-runner }}
           test-runner-args: ${{ inputs.test-runner-args }}
-          build-directory: C:\build
+          build-directory: C:\b
         env:
           artifact-naming-scheme: pecl
           auto-detect-args: true
@@ -104,6 +100,7 @@ jobs:
           name: artifacts
           delete-merged: true
 
+
   pecl-release:
     runs-on: ubuntu-latest
     needs: artifacts
@@ -118,24 +115,14 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           ls -l artifacts
+          extension=$(basename "${{ inputs.extension-url }}")
           extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
           mkdir -p /tmp/$extension/${{ inputs.extension-ref }}/
           cp -a artifacts/* /tmp/$extension/${{ inputs.extension-ref }}/
           cd /tmp || exit 1
           zip -r $extension-${{ inputs.extension-ref }}.zip $extension
           if ! gh release view pecl -R ${{ github.repository }}; then
-            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t pecl -n pecl -R ${{ github.repository }}
+            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t "$extension ${{ inputs.extension-ref }}" -n "Release of PECL extension '$extension', version ${{ inputs.extension-ref }}" -R ${{ github.repository }}
           else
             gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
           fi
-  upload:
-    runs-on: ubuntu-latest
-    needs: pecl-release
-    steps:
-      - name: Upload to downloads server
-        run: |
-          extension=$(basename "${{ inputs.extension-url }}")
-          url="https://github.com/${{ github.repository }}/releases/download/pecl/$extension-${{ inputs.extension-ref }}.zip"
-          gh workflow run pecl.yml -R php/web-downloads -f url="$url" -f extension="$extension" -f ref="${{ inputs.extension-ref }}"
-        env:
-          GITHUB_TOKEN: ${{ secrets.WINDOWS_BUILDS_TOKEN }}

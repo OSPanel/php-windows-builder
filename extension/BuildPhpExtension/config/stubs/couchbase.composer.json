@@ -1,0 +1,12 @@
+{
+    "require":
+    {
+        "ext-apcu": "*",
+        "ext-igbinary": "*",
+        "ext-json": "*",
+        "ext-lzf": "*",
+        "ext-lz4": "*",
+        "zlib": "*",
+        "pthreads": "*"
+    }
+}

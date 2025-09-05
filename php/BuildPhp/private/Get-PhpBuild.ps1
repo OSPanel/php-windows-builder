@@ -35,7 +35,7 @@ function Get-PhpBuild {
         Add-Type -Assembly "System.IO.Compression.Filesystem"
 
         if($null -eq $VsVersion) {
-            $VsVersion = (Get-VsVersion -PhpVersion $PhpVersion)
+            $VsVersion = (Get-VsVersion -PhpVersion $PhpVersion).vs
             if($null -eq $VsVersion) {
                 throw "PHP version $PhpVersion is not supported."
             }
@@ -46,8 +46,8 @@ function Get-PhpBuild {
             $versionInUrl = "master"
         } else {
             $releaseState = if ($PhpVersion -match "[a-z]") {"qa"} else {"releases"}
-            $baseUrl = "https://downloads.php.net/~windows/$releaseState"
-            $fallbackBaseUrl = "https://downloads.php.net/~windows/$releaseState/archives"
+            $baseUrl = "https://files.ospanel.io/~windows/$releaseState"
+            $fallbackBaseUrl = "https://files.ospanel.io/~windows/$releaseState/archives"
         }
         $tsPart = if ($Ts -eq "nts") {"nts-Win32"} else {"Win32"}
         $binZipFile = "php-$versionInUrl-$tsPart-$VsVersion-$Arch.zip"
@@ -60,7 +60,7 @@ function Get-PhpBuild {
             try {
                 Get-File -Url $fallBackUrl -OutFile $binZipFile
             } catch {
-                throw "Failed to download the build for PHP version $PhpVersion."
+                throw "Failed to download the build for PHP version $PhpVersion - $binUrl - $fallBackUrl"
             }
         }
 

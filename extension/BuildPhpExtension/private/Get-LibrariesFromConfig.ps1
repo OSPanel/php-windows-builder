@@ -27,10 +27,10 @@ Function Get-LibrariesFromConfig {
     }
     process {
         $jsonData = (
-        Get-File -Url "https://downloads.php.net/~windows/pecl/deps/libmapping.json"
+        Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/libmapping.json"
         ).Content | ConvertFrom-Json
 
-        $phpSeries = (Get-File -Url "https://downloads.php.net/~windows/php-sdk/deps/$VsVersion/$Arch").Content.ToLower()
+        $phpSeries = (Get-File -Url "https://files.ospanel.io/~windows/php-sdk/deps/$VsVersion/$Arch").Content.ToLower()
 
         Function Find-Library {
             param (

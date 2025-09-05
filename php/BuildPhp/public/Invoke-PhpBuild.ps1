@@ -50,14 +50,10 @@ function Invoke-PhpBuild {
 
         Copy-Item -Path $PSScriptRoot\..\config -Destination . -Recurse
         $buildPath = "$buildDirectory\config\$($VsConfig.vs)\$Arch\php-$PhpVersion"
-        $sourcePath = "$buildDirectory\php-$PhpVersion-src"
-        if(-not($fetchSrc)) {
-            $sourcePath = $currentDirectory
-        }
-        Move-Item $sourcePath $buildPath
+        Move-Item "$buildDirectory\php-$PhpVersion-src" $buildPath
         Set-Location "$buildPath"
         New-Item "..\obj" -ItemType "directory" > $null 2>&1
-        Copy-Item "..\config.$Ts.bat"
+        Copy-Item "..\$(($PhpVersion -replace '^(\d+\.\d+).*', '$1'))\config.$Ts.bat"
 
         $task = "$PSScriptRoot\..\runner\task-$Ts.bat"
 
@@ -70,6 +66,12 @@ function Invoke-PhpBuild {
         New-Item "$currentDirectory\artifacts" -ItemType "directory" -Force > $null 2>&1
         xcopy $artifacts "$currentDirectory\artifacts\*"
         Move-Item "$buildDirectory\php-$PhpVersion-src.zip" "$currentDirectory\artifacts\"
+        $VsPath = $VsConfig.vs
+        $paths = @(
+            "$buildDirectory\config\$VsPath\$Arch\deps\bin"
+        )
+
+        Compress-Archive -Path $paths -DestinationPath "$currentDirectory\artifacts\php-$PhpVersion-bin-$Ts-Win32-$VsPath-$Arch.zip"
 
         Set-Location "$currentDirectory"
     }

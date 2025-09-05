@@ -1,25 +1,64 @@
 name: Build PHP
 run-name: Build PHP ${{ inputs.php-version }}
+
 on:
   workflow_dispatch:
     inputs:
       php-version:
-        description: 'PHP version to build'
+        description: 'PHP versions to build (comma-separated)'
         required: true
+      arch:
+        description: 'Architecture'
+        required: true
+        type: choice
+        options: ['x64', 'x86']
+        default: 'x64'
+      ts:
+        description: 'Thread safety'
+        required: true
+        type: choice
+        options: ['ts', 'nts', 'ts,nts']
+        default: 'ts,nts'
       upload:
         type: choice
         options: ['true', 'false']
         description: Upload artifacts to the downloads server
         required: false
         default: 'true'
-
+        
 jobs:
+  generate-matrix:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.set-matrix.outputs.matrix }}
+    steps:
+      - id: set-matrix
+        run: |
+          ARCH="${{ inputs.arch }}"
+          TS_INPUT="${{ inputs.ts }}"
+          PHP_VERSIONS="${{ inputs.php-version }}"
+
+          IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
+          IFS=',' read -ra PHP_VALUES <<< "$PHP_VERSIONS"
+          
+          MATRIX_JSON="{\"include\":["
+          SEP=""
+          for PHP_VERSION in "${PHP_VALUES[@]}"; do
+            for TS in "${TS_VALUES[@]}"; do
+              MATRIX_JSON+="${SEP}{\"php-version\":\"$PHP_VERSION\",\"arch\":\"$ARCH\",\"ts\":\"$TS\"}"
+              SEP=","
+            done
+          done
+          MATRIX_JSON+="]}"
+
+          echo "Generated matrix: $MATRIX_JSON"
+          echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+
   php:
-    strategy:
-      matrix:
-        arch: [x64, x86]
-        ts: [nts, ts]
+    needs: generate-matrix
     runs-on: windows-2022
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -27,30 +66,34 @@ jobs:
       - name: Build
         uses: ./php
         with:
-          php-version: ${{ github.event.inputs.php-version }}
+          php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
 
   artifacts:
     runs-on: ubuntu-latest
-    needs: php
-    outputs:
-      artifact-id: ${{ steps.artifacts.outputs.artifact-id }}
+    needs: [generate-matrix, php]
+    strategy:
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Upload artifacts
-        uses: actions/upload-artifact/merge@v4
-        id: artifacts
-        with:
-          name: artifacts
-          delete-merged: true
-  upload:
-    runs-on: ubuntu-latest
-    needs: artifacts
-    if: ${{ github.event.inputs.upload == 'true' }}
-    steps:
-      - name: Upload to downloads server
-        run: |
-          url="https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${{ needs.artifacts.outputs.artifact-id }}/zip"
-          gh workflow run php.yml -R php/web-downloads -f url="$url" -f php-version=${{ inputs.php-version }}
+      - name: Create PHP release
         env:
-          GITHUB_TOKEN: ${{ secrets.WINDOWS_BUILDS_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version="${{ matrix.php-version }}"
+          phpts="${{ matrix.ts }}"
+          phparch="${{ matrix.arch }}"
+          artifact_name="artifacts-${version}-${phparch}-${phpts}"
+          
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
+          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
+            -o "php-${version}-${phpts}-${phparch}.zip"
+          
+          # Загружаем в релиз
+          if ! gh release view php-${version} -R ${{ github.repository }}; then
+            gh release create php-${version} "php-${version}-${phpts}-${phparch}.zip" -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+          else
+            gh release upload php-${version} "php-${version}-${phpts}-${phparch}.zip" -R ${{ github.repository }} --clobber
+          fi

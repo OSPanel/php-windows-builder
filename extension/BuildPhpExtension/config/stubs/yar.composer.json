@@ -1,0 +1,19 @@
+{
+    "require":
+    {
+        "openssl": "*",
+        "libcurl": "*",
+        "nghttp2": "*",
+        "libssh2": "*",
+        "ext-apcu": "*",
+        "ext-igbinary": "*",
+        "ext-msgpack": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-yar"
+        }]
+    }
+}

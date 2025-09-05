@@ -19,13 +19,10 @@ function Get-PhpSrc {
         $zipFile = "php-$PhpVersion.zip"
         $directory = "php-$PhpVersion-src"
 
-        if ( $PhpVersion.Contains("."))
-        {
+        if ($PhpVersion.Contains(".")) {
             $ref = "php-$PhpVersion"
             $url = "$baseUrl/refs/tags/php-$PhpVersion.zip"
-        }
-        else
-        {
+        } else {
             $ref = $PhpVersion
             $url = "$baseUrl/$PhpVersion.zip"
         }
@@ -38,6 +35,13 @@ function Get-PhpSrc {
         Get-File -Url $url -Outfile $zipFile
         [System.IO.Compression.ZipFile]::ExtractToDirectory($zipFilePath, $currentDirectory)
         Rename-Item -Path "php-src-$ref" -NewName $directory
+
+        if ($PhpVersion -like "7.2*") {
+            $mkdistDestinationDir = Join-Path $directoryPath "win32\build"
+            $mkdistFilePath = Join-Path $mkdistDestinationDir "mkdist.php"
+            (Get-Content $mkdistFilePath) | ForEach-Object { $_ -replace '\$checksum \+= ord\(\$hdr_data\{\$i\}\);', '$checksum += ord($hdr_data[$i]);' } | Set-Content $mkdistFilePath
+        }
+
         [System.IO.Compression.ZipFile]::CreateFromDirectory($directoryPath, $srcZipFilePath)
     }
     end {

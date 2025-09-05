@@ -1,0 +1,13 @@
+{
+    "require":
+    {
+        "librrd": "*"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "with-rrd"
+        }]
+    }
+}

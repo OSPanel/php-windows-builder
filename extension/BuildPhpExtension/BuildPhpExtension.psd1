@@ -3,7 +3,7 @@
     RootModule = 'BuildPhpExtension'
 
     # Version number of this module.
-    ModuleVersion = '1.1.7.0'
+    ModuleVersion = '1.0.0.0'
 
     # Supported PSEditions
     # CompatiblePSEditions = @()
@@ -83,7 +83,7 @@
         'Get-BuildDirectory',
         'Get-Extension',
         'Get-ExtensionConfig',
-        'Get-ExtensionSource'
+        'Get-ExtensionSource',
         'Get-File',
         'Get-LibrariesFromConfig',
         'Get-OlderVsVersion',
