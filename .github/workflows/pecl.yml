@@ -90,39 +90,51 @@ jobs:
           auto-detect-libs: true
           no-debug-symbols-ddtrace: true
 
-  artifacts:
-    runs-on: ubuntu-latest
-    needs: extension
-    steps:
-      - name: Upload artifacts
-        uses: actions/upload-artifact/merge@v4
-        with:
-          name: artifacts
-          delete-merged: true
-
-
   pecl-release:
     runs-on: ubuntu-latest
-    needs: artifacts
+    needs: [get-extension-matrix, extension]
+    strategy:
+      matrix: ${{fromJson(needs.get-extension-matrix.outputs.matrix)}}
     steps:
-      - name: Get artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: artifacts
-          path: artifacts
-      - name: Release
+      - name: Create PECL release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          ls -l artifacts
-          extension=$(basename "${{ inputs.extension-url }}")
           extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
-          mkdir -p /tmp/$extension/${{ inputs.extension-ref }}/
-          cp -a artifacts/* /tmp/$extension/${{ inputs.extension-ref }}/
-          cd /tmp || exit 1
-          zip -r $extension-${{ inputs.extension-ref }}.zip $extension
-          if ! gh release view pecl -R ${{ github.repository }}; then
-            gh release create pecl $extension-${{ inputs.extension-ref }}.zip -t "$extension ${{ inputs.extension-ref }}" -n "Release of PECL extension '$extension', version ${{ inputs.extension-ref }}" -R ${{ github.repository }}
+          php_version="${{ matrix.php-version }}"
+          arch="${{ matrix.arch }}"
+          ts="${{ matrix.ts }}"
+          ref="${{ inputs.extension-ref }}"
+          
+          # Имя артефакта соответствует тому, что создается в extension job (с префиксом php_)
+          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-vs16-${arch}"
+          
+          # Имя файла для релиза БЕЗ префикса php_
+          release_filename="${extension}-${ref}-php-${php_version}-${ts}-vs16-${arch}.zip"
+          
+          # Получаем ID артефакта и скачиваем как zip
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
+          
+          if [ -z "$artifact_id" ]; then
+            echo "Artifact ${artifact_name} not found"
+            exit 1
+          fi
+          
+          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
+            -o "${release_filename}"
+          
+          # Релиз по версии расширения
+          release_tag="${extension}-${ref}"
+          
+          # Создаем или обновляем релиз
+          if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
+            gh release create "${release_tag}" "${release_filename}" \
+              -t "${extension} ${ref}" \
+              -n "Release of PECL extension '${extension}' version ${ref}" \
+              -R ${{ github.repository }}
           else
-            gh release upload pecl $extension-${{ inputs.extension-ref }}.zip -R ${{ github.repository }} --clobber
+            gh release upload "${release_tag}" "${release_filename}" \
+              -R ${{ github.repository }} --clobber
           fi
