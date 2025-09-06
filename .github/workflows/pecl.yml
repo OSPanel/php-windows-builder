@@ -115,7 +115,6 @@ jobs:
           
           artifact_name="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
           release_tag="${extension}-${ref}"
-
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
             --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
 
@@ -128,24 +127,20 @@ jobs:
             -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o artifact_wrapper.zip
+            -o "artifact_wrapper.zip"
 
-<<<<<<< HEAD
-          unzip -oq artifact_wrapper.zip
-=======
-          New-Item -Path ".\$artifact_id" -ItemType Directory -Force | Out-Null
-          unzip -oq artifact_wrapper.zip -d "./$artifact_id"
->>>>>>> parent of d5b3e83 (Update pecl.yml)
-
-          if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            if ! gh release create "${release_tag}" php-* \
+          unzip "artifact_wrapper.zip"
+          
+          # Release by extension version
+          release_tag="${extension}-${ref}"
+          
+          # Create or update release
+          if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
+            gh release create "${release_tag}" "${artifact_name}" \
               -t "${extension} ${ref}" \
               -n "Release of PECL extension '${extension}' version ${ref}" \
-              -R ${{ github.repository }}; then
-                gh release upload "${release_tag}" php-* \
-                  -R ${{ github.repository }} --clobber
-            fi
+              -R ${{ github.repository }}
           else
-            gh release upload "${release_tag}" php-* \
+            gh release upload "${release_tag}" "${artifact_name}" \
               -R ${{ github.repository }} --clobber
           fi
