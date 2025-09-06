@@ -56,8 +56,13 @@ function Invoke-PhpBuild {
         Copy-Item "..\$(($PhpVersion -replace '^(\d+\.\d+).*', '$1'))\config.$Ts.bat"
 
         $task = "$PSScriptRoot\..\runner\task-$Ts.bat"
-
-        & "$buildDirectory\php-sdk\phpsdk-starter.bat" -c $VsConfig.vs -a $Arch -s $VsConfig.toolset -t $task
+            $suffix = "php-" + (@(
+                $PhpVersion,
+                $Ts,
+                $VsConfig.vs,
+                $Arch
+            ) -join "-")
+        & "$buildDirectory\php-sdk\phpsdk-starter.bat" -c $VsConfig.vs -a $Arch -s $VsConfig.toolset -t $task | Tee-Object -FilePath "build-$suffix.txt"
         if (-not $?) {
             throw "build failed with errorlevel $LastExitCode"
         }
