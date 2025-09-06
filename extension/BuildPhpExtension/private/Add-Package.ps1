@@ -121,7 +121,7 @@ function Add-Package {
             Get-ChildItem -Path $ArtifactsPath -Force | ForEach-Object {
                 Move-Item -Path $_.FullName -Destination $currentDirectory -Force
             }
-
+            Compress-Archive -Path $ArtifactsPath\* -DestinationPath "$artifact.zip"
             Set-GAGroup end
             Add-BuildLog tick "Packaging" "Extension $($Config.name) packaged successfully"
         } catch {
