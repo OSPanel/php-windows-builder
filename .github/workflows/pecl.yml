@@ -70,11 +70,7 @@ jobs:
         run: |
           extension_url="${{ inputs.extension-url }}"
           extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          echo "Original extension: $extension"
-
-
-
- 
+          
           # Replace extension names
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
@@ -87,7 +83,7 @@ jobs:
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
-          echo "Final extension: $extension" 
+
           ref="${{ inputs.extension-ref }}"
           # Remove 'v' prefix from version
           ref=$(echo "$ref" | sed 's/^v//')
@@ -141,7 +137,7 @@ jobs:
           extension_url="${{ inputs.extension-url }}"
           extension_original=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
           extension="$extension_original"
-                echo "Original extension: $extension"
+
           # Replace extension names for release
           case "$extension_original" in
             "base58-php-ext") extension="base58" ;;
@@ -154,7 +150,7 @@ jobs:
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
-                echo "Final extension: $extension"
+
           php_version="${{ matrix.php-version }}"
           arch="${{ matrix.arch }}"
           ts="${{ matrix.ts }}"
@@ -170,17 +166,21 @@ jobs:
           
           # Artifact name uses original extension name and ref with 'v'
           artifact_name="php_${extension_original}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
+          artifact_name_modern="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
           # Release uses new extension name and ref without 'v'
           release_tag="${extension}-${ref_clean}"
-                     echo "Final 1 extension: $extension" 
           release_asset_name="php_${extension}-${ref_clean}-${php_version}-${ts}-${vs_version}-${arch}.zip"
-                         echo "Final asset extension: $release_asset_name" 
+          
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
             --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
 
-          if [ -z "$artifact_id" ]; then
-            echo "Artifact ${artifact_name} not found"
-            exit 1
+          if [ -z "$artifact_id" ]; then            
+            artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq ".artifacts[] | select(.name==\"${artifact_name_modern}\") | .id")            
+            if [ -z "$artifact_id" ]; then
+              echo "Artifact ${artifact_name} not found"
+              exit 1
+            fi
           fi
 
           curl -L \
@@ -190,7 +190,7 @@ jobs:
             -o "artifact_wrapper.zip"
 
           unzip "artifact_wrapper.zip"
-           echo "Final 2 extension: $extension" 
+
           # Rename the artifact file to the new naming scheme
           if [ -f "${artifact_name}" ]; then
             if [ "${artifact_name}" != "${release_asset_name}" ]; then
