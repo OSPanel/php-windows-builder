@@ -77,7 +77,7 @@ function Invoke-PhpBuild {
             "$buildDirectory\config\$VsPath\$Arch\deps\bin"
         )
 
-        Compress-Archive -Path $paths -DestinationPath "$currentDirectory\artifacts\php-$PhpVersion-bin-$Ts-Win32-$VsPath-$Arch.zip"
+        Compress-Archive -Path $paths -DestinationPath "$currentDirectory\artifacts\php-bin-pack-$PhpVersion-$Ts-Win32-$VsPath-$Arch.zip"
 
         Set-Location "$currentDirectory"
     }
