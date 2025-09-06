@@ -114,7 +114,6 @@ function Add-Package {
             }
 
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
-            Remove-Item * -Recurse -Force -Exclude *.zip
             Set-GAGroup end
             Add-BuildLog tick "Packaging" "Extension $($Config.name) packaged successfully"
         } catch {
