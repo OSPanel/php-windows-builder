@@ -135,11 +135,16 @@ jobs:
           release_tag="${extension}-${ref}"
           
           # Create or update release
-          if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
-            gh release create "${release_tag}" "${artifact_name}" \
+          if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Release ${release_tag} not found → trying to create"
+            if ! gh release create "${release_tag}" "${artifact_name}" \
               -t "${extension} ${ref}" \
               -n "Release of PECL extension '${extension}' version ${ref}" \
-              -R ${{ github.repository }}
+              -R ${{ github.repository }}; then
+              echo "Release already created by another workflow → uploading"
+              gh release upload "${release_tag}" "${artifact_name}" \
+                -R ${{ github.repository }} --clobber
+            fi
           else
             gh release upload "${release_tag}" "${artifact_name}" \
               -R ${{ github.repository }} --clobber
