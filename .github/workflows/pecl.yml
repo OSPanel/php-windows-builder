@@ -68,8 +68,24 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
+          extension_url="${{ inputs.extension-url }}"
+          extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
+          
+          # Replace extension names
+          case "$extension" in
+            "base58-php-ext") extension="base58" ;;
+            "dd-trace-php") extension="ddtrace" ;;
+            "php-firebird") extension="interbase" ;;
+            "php-ext-lz4") extension="lz4" ;;
+            "php-memcached") extension="memcached" ;;
+            "pecl-database-oci8") extension="oci8" ;;
+            "pecl-database-pdo_oci") extension="pdo_oci" ;;
+            "pecl-text-ssdeep") extension="ssdeep" ;;
+          esac
+          
           ref="${{ inputs.extension-ref }}"
+          # Remove 'v' prefix from version
+          ref=$(echo "$ref" | sed 's/^v//')
           release_tag="${extension}-${ref}"
         
           if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
@@ -117,11 +133,27 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
+          extension_url="${{ inputs.extension-url }}"
+          extension_original=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
+          extension="$extension_original"
+          
+          # Replace extension names for release
+          case "$extension_original" in
+            "base58-php-ext") extension="base58" ;;
+            "dd-trace-php") extension="ddtrace" ;;
+            "php-firebird") extension="interbase" ;;
+            "php-ext-lz4") extension="lz4" ;;
+            "php-memcached") extension="memcached" ;;
+            "pecl-database-oci8") extension="oci8" ;;
+            "pecl-database-pdo_oci") extension="pdo_oci" ;;
+            "pecl-text-ssdeep") extension="ssdeep" ;;
+          esac
+          
           php_version="${{ matrix.php-version }}"
           arch="${{ matrix.arch }}"
           ts="${{ matrix.ts }}"
           ref="${{ inputs.extension-ref }}"
+          ref_clean=$(echo "$ref" | sed 's/^v//')
 
           case "$php_version" in
             7.2|7.3|7.4) vs_version="vc15" ;;
@@ -130,8 +162,12 @@ jobs:
             *) vs_version="vs16" ;; # fallback
           esac
           
-          artifact_name="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
-          release_tag="${extension}-${ref}"
+          # Artifact name uses original extension name and ref with 'v'
+          artifact_name="php_${extension_original}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
+          # Release uses new extension name and ref without 'v'
+          release_tag="${extension}-${ref_clean}"
+          release_asset_name="php_${extension}-${ref_clean}-${php_version}-${ts}-${vs_version}-${arch}.zip"
+          
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
             --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
 
@@ -148,10 +184,12 @@ jobs:
 
           unzip "artifact_wrapper.zip"
           
-          # Release by extension version
-          release_tag="${extension}-${ref}"
+          # Rename the artifact file to the new naming scheme
+          if [ -f "${artifact_name}" ]; then
+            mv "${artifact_name}" "${release_asset_name}"
+          fi
           
-          gh release upload "${release_tag}" "${artifact_name}" \
+          gh release upload "${release_tag}" "${release_asset_name}" \
           -R ${{ github.repository }} --clobber
 
   cleanup-artifacts:
@@ -190,9 +228,25 @@ jobs:
         run: |
           set -e
 
-          extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
+          extension_url="${{ inputs.extension-url }}"
+          extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
+          
+          # Replace extension names
+          case "$extension" in
+            "base58-php-ext") extension="base58" ;;
+            "dd-trace-php") extension="ddtrace" ;;
+            "php-firebird") extension="interbase" ;;
+            "php-ext-lz4") extension="lz4" ;;
+            "php-memcached") extension="memcached" ;;
+            "pecl-database-oci8") extension="oci8" ;;
+            "pecl-database-pdo_oci") extension="pdo_oci" ;;
+            "pecl-text-ssdeep") extension="ssdeep" ;;
+          esac
+          
           ref="${{ inputs.extension-ref }}"
-          release_tag="${extension}-${ref}"
+          # Remove 'v' prefix from version for release
+          ref_clean=$(echo "$ref" | sed 's/^v//')
+          release_tag="${extension}-${ref_clean}"
 
           echo "=== Starting cleanup for release: $release_tag ==="
 
