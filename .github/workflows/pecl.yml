@@ -167,6 +167,7 @@ jobs:
           # Artifact name uses original extension name and ref with 'v'
           artifact_name="php_${extension_original}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
           artifact_name_modern="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
+          final_name="${artifact_name}"
           # Release uses new extension name and ref without 'v'
           release_tag="${extension}-${ref_clean}"
           release_asset_name="php_${extension}-${ref_clean}-${php_version}-${ts}-${vs_version}-${arch}.zip"
@@ -176,7 +177,8 @@ jobs:
 
           if [ -z "$artifact_id" ]; then            
             artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            --jq ".artifacts[] | select(.name==\"${artifact_name_modern}\") | .id")            
+            --jq ".artifacts[] | select(.name==\"${artifact_name_modern}\") | .id")   
+            final_name="${artifact_name_modern}"
             if [ -z "$artifact_id" ]; then
               echo "Artifact ${artifact_name} not found"
               exit 1
@@ -192,9 +194,9 @@ jobs:
           unzip "artifact_wrapper.zip"
 
           # Rename the artifact file to the new naming scheme
-          if [ -f "${artifact_name}" ]; then
-            if [ "${artifact_name}" != "${release_asset_name}" ]; then
-              mv "${artifact_name}" "${release_asset_name}"
+          if [ -f "${final_name}" ]; then
+            if [ "${final_name}" != "${release_asset_name}" ]; then
+              mv "${final_name}" "${release_asset_name}"
             fi
           fi
           
