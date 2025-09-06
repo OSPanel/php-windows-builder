@@ -18,6 +18,8 @@ function Add-Package {
             Set-GAGroup start
             $currentDirectory = (Get-Location).Path
             New-Item -Path $currentDirectory\artifacts -ItemType Directory -Force | Out-Null
+            New-Item -Path $currentDirectory\artifacts\logs -ItemType Directory -Force | Out-Null
+            Copy-Item -Path build-*.txt -Destination artifacts\logs\ -Force 
             $docsFiles = @("LICENSE", "COPYRIGHT", "COPYING")
             $docsFiles | ForEach-Object {
                 if(Test-Path -Path $_) {
@@ -113,10 +115,6 @@ function Add-Package {
 
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
             Remove-Item * -Recurse -Force -Exclude *.zip
-
-            Set-Location $currentDirectory
-            New-Item -Path $currentDirectory\artifacts\logs -ItemType Directory -Force | Out-Null
-            Copy-Item -Path build-*.txt -Destination artifacts\logs\ -Force
             Set-Location $currentDirectory\artifacts\logs
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
             Remove-Item * -Recurse -Force -Exclude *.zip
