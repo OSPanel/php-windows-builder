@@ -51,7 +51,7 @@ function Add-Package {
                 }
             }
 
-            if (Test-Path '..\deps\bin') { New-Item -ItemType Directory -Path "artifacts\artifacts-bin" -Force | Out-Null; Copy-Item '..\deps\bin' -Destination "artifacts\artifacts-bin" -Recurse -Force }
+            if (Test-Path '..\deps\bin') { New-Item -ItemType Directory -Path "artifacts\bin" -Force | Out-Null; Copy-Item '..\deps\bin\*' -Destination "artifacts\bin" -Recurse -Force }
 
             if(Test-Path ..\deps\bin) {
                 $dllMap = Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/dllmapping.json"
