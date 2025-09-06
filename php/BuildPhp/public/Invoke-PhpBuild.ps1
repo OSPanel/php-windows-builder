@@ -70,6 +70,7 @@ function Invoke-PhpBuild {
         $artifacts = if ($Ts -eq "ts") {"..\obj\Release_TS\php-*.zip"} else {"..\obj\Release\php-*.zip"}
         New-Item "$currentDirectory\artifacts" -ItemType "directory" -Force > $null 2>&1
         xcopy $artifacts "$currentDirectory\artifacts\*"
+        xcopy ".\build-*.txt" "$currentDirectory\artifacts\*"
         Move-Item "$buildDirectory\php-$PhpVersion-src.zip" "$currentDirectory\artifacts\"
         $VsPath = $VsConfig.vs
         $paths = @(
