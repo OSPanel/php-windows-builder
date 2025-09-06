@@ -131,17 +131,17 @@ jobs:
             -o artifact_wrapper.zip
 
           mkdir -p "$artifact_id"
-          unzip -oq artifact_wrapper.zip -d "./$artifact_id"
+          unzip -oq artifact_wrapper.zip -d "${artifact_id}"
 
           if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            if ! gh release create "${release_tag}" ./$artifact_id/php-* \
+            if ! gh release create "${release_tag}" ${artifact_id}/php-* \
               -t "${extension} ${ref}" \
               -n "Release of PECL extension '${extension}' version ${ref}" \
               -R ${{ github.repository }}; then
-                gh release upload "${release_tag}" ./$artifact_id/php-* \
+                gh release upload "${release_tag}" ${artifact_id}/php-* \
                   -R ${{ github.repository }} --clobber
             fi
           else
-            gh release upload "${release_tag}" ./$artifact_id/php-* \
+            gh release upload "${release_tag}" ${artifact_id}/php-* \
               -R ${{ github.repository }} --clobber
           fi
