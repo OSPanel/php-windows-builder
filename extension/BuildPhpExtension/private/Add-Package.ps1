@@ -112,8 +112,7 @@ function Add-Package {
             if($null -ne $env:GITHUB_OUTPUT) {
                 Add-Content "artifact=$artifact.zip" -Path $env:GITHUB_OUTPUT -Encoding utf8
             }
-            Compress-Archive -Path * -DestinationPath "$artifact.zip"
-            Remove-Item $currentDirectory\artifacts\* -Recurse -Force -Exclude *.zip
+
             Set-GAGroup end
             Add-BuildLog tick "Packaging" "Extension $($Config.name) packaged successfully"
         } catch {
