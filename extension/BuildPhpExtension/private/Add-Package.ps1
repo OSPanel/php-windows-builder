@@ -114,7 +114,6 @@ function Add-Package {
             }
 
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
-            Remove-Item * -Recurse -Force -Exclude *.zip
             Set-Location $currentDirectory\artifacts\logs
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
             Remove-Item * -Recurse -Force -Exclude *.zip
