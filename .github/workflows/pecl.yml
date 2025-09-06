@@ -96,7 +96,7 @@ jobs:
     strategy:
       matrix: ${{fromJson(needs.get-extension-matrix.outputs.matrix)}}
     steps:
-      - name: Create PECL release
+      - name: Create or Update PECL Release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -105,43 +105,43 @@ jobs:
           arch="${{ matrix.arch }}"
           ts="${{ matrix.ts }}"
           ref="${{ inputs.extension-ref }}"
-          
-          # Determine VS version based on PHP version
+
           case "$php_version" in
             7.2|7.3|7.4) vs_version="vc15" ;;
             8.0|8.1|8.2|8.3) vs_version="vs16" ;;
             8.4|8.5) vs_version="vs17" ;;
-            *) vs_version="vs16" ;; # default fallback
+            *) vs_version="vs16" ;; # fallback
           esac
           
-          # Artifact name matches what's created in extension job (with .zip extension)
           artifact_name="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
-          
-          # Get artifact ID and download as zip
-          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
-          
+          release_tag="${extension}-${ref}"
+
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
+            --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
+
           if [ -z "$artifact_id" ]; then
             echo "Artifact ${artifact_name} not found"
             exit 1
           fi
-          
-          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+
+          curl -L \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o "artifact_wrapper.zip"
+            -o artifact_wrapper.zip
 
-          unzip "artifact_wrapper.zip"
-          
-          # Release by extension version
-          release_tag="${extension}-${ref}"
-          
-          # Create or update release
-          if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
-            gh release create "${release_tag}" "${artifact_name}" \
+          New-Item -Path ".\$artifact_id" -ItemType Directory -Force | Out-Null
+          unzip -oq artifact_wrapper.zip -d "./$artifact_id"
+
+          if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            if ! gh release create "${release_tag}" ./$artifact_id/php-* \
               -t "${extension} ${ref}" \
               -n "Release of PECL extension '${extension}' version ${ref}" \
-              -R ${{ github.repository }}
+              -R ${{ github.repository }}; then
+                gh release upload "${release_tag}" ./$artifact_id/php-* \
+                  -R ${{ github.repository }} --clobber
+            fi
           else
-            gh release upload "${release_tag}" "${artifact_name}" \
+            gh release upload "${release_tag}" ./$artifact_id/php-* \
               -R ${{ github.repository }} --clobber
           fi
