@@ -117,9 +117,6 @@ jobs:
           # Artifact name matches what's created in extension job (with .zip extension)
           artifact_name="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
           
-          # Release filename WITHOUT php_ prefix
-          release_filename="${extension}-${ref}-php-${php_version}-${ts}-${vs_version}-${arch}.zip"
-          
           # Get artifact ID and download as zip
           artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
           
@@ -131,18 +128,18 @@ jobs:
           curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o "${release_filename}"
+            -o "${artifact_name}"
           
           # Release by extension version
           release_tag="${extension}-${ref}"
           
           # Create or update release
           if ! gh release view "${release_tag}" -R ${{ github.repository }}; then
-            gh release create "${release_tag}" "${release_filename}" \
+            gh release create "${release_tag}" "${artifact_name}" \
               -t "${extension} ${ref}" \
               -n "Release of PECL extension '${extension}' version ${ref}" \
               -R ${{ github.repository }}
           else
-            gh release upload "${release_tag}" "${release_filename}" \
+            gh release upload "${release_tag}" "${artifact_name}" \
               -R ${{ github.repository }} --clobber
           fi
