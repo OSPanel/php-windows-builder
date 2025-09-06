@@ -62,7 +62,7 @@ function Invoke-PhpBuild {
                 $VsConfig.vs,
                 $Arch
             ) -join "-")
-        & "$buildDirectory\php-sdk\phpsdk-starter.bat" -c $VsConfig.vs -a $Arch -s $VsConfig.toolset -t $task | Tee-Object -FilePath "build-$suffix.txt"
+        & "$buildDirectory\php-sdk\phpsdk-starter.bat" -c $VsConfig.vs -a $Arch -s $VsConfig.toolset -t $task | Tee-Object -FilePath "$suffix-build-log.txt"
         if (-not $?) {
             throw "build failed with errorlevel $LastExitCode"
         }
