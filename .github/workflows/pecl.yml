@@ -75,6 +75,7 @@ jobs:
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
+            "msgpack-php") extension="msgpack" ;;
             "php-firebird") extension="interbase" ;;
             "php-ext-lz4") extension="lz4" ;;
             "php-memcached") extension="memcached" ;;
@@ -141,6 +142,7 @@ jobs:
           case "$extension_original" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
+            "msgpack-php") extension="msgpack" ;;
             "php-firebird") extension="interbase" ;;
             "php-ext-lz4") extension="lz4" ;;
             "php-memcached") extension="memcached" ;;
@@ -235,6 +237,7 @@ jobs:
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
+            "msgpack-php") extension="msgpack" ;;
             "php-firebird") extension="interbase" ;;
             "php-ext-lz4") extension="lz4" ;;
             "php-memcached") extension="memcached" ;;
