@@ -92,6 +92,13 @@ jobs:
             -o "artifact_wrapper.zip"
 
           unzip -o "artifact_wrapper.zip"
+
+          Get-ChildItem -Filter *.zip | ForEach-Object {
+              $lowerName = $_.Name.ToLower()
+              if ($_.Name -ne $lowerName) {
+                  Rename-Item -Path $_.FullName -NewName $lowerName
+              }
+          }
           
           if ! gh release view php-${version} -R ${{ github.repository }}; then
             gh release create php-${version} php-* -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
