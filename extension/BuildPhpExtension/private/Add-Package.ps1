@@ -72,9 +72,7 @@ function Add-Package {
                     }
                 }
             }
-            
-            Copy-Item -Path build-*.txt -Destination artifacts -Force
-            
+
             Set-Location $currentDirectory\artifacts
             if(Test-Path -Path "vc140.pdb") {
                 Remove-Item -Path "vc140.pdb" -Force
@@ -113,6 +111,13 @@ function Add-Package {
                 Add-Content "artifact=$artifact.zip" -Path $env:GITHUB_OUTPUT -Encoding utf8
             }
 
+            Compress-Archive -Path * -DestinationPath "$artifact.zip"
+            Remove-Item * -Recurse -Force -Exclude *.zip
+
+            Set-Location $currentDirectory
+            New-Item -Path $currentDirectory\artifacts\logs -ItemType Directory -Force | Out-Null
+            Copy-Item -Path build-*.txt -Destination artifacts\logs\ -Force
+            Set-Location $currentDirectory\artifacts\logs
             Compress-Archive -Path * -DestinationPath "$artifact.zip"
             Remove-Item * -Recurse -Force -Exclude *.zip
             Set-GAGroup end
