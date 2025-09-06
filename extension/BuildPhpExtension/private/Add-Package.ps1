@@ -113,15 +113,8 @@ function Add-Package {
                 Add-Content "artifact=$artifact.zip" -Path $env:GITHUB_OUTPUT -Encoding utf8
             }
 
-            Get-ChildItem -Path $currentDirectory -Force | Where-Object {
-                $_.Name -ne "artifacts"
-                } | Remove-Item -Recurse -Force
-
-            $ArtifactsPath = Join-Path $currentDirectory "artifacts"
-            Get-ChildItem -Path $ArtifactsPath -Force | ForEach-Object {
-                Move-Item -Path $_.FullName -Destination $currentDirectory -Force
-            }
-            Compress-Archive -Path $ArtifactsPath\* -DestinationPath "$artifact.zip"
+            Compress-Archive -Path * -DestinationPath "$artifact.zip"
+            Remove-Item * -Recurse -Force -Exclude *.zip
             Set-GAGroup end
             Add-BuildLog tick "Packaging" "Extension $($Config.name) packaged successfully"
         } catch {
