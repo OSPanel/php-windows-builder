@@ -70,7 +70,11 @@ jobs:
         run: |
           extension_url="${{ inputs.extension-url }}"
           extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          
+          echo "Original extension: $extension_original"
+
+
+
+ 
           # Replace extension names
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
@@ -83,7 +87,7 @@ jobs:
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
-          
+          echo "Final extension: $extension" 
           ref="${{ inputs.extension-ref }}"
           # Remove 'v' prefix from version
           ref=$(echo "$ref" | sed 's/^v//')
