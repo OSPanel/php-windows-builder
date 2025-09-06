@@ -70,7 +70,7 @@ jobs:
         run: |
           extension_url="${{ inputs.extension-url }}"
           extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          echo "Original extension: $extension_original"
+          echo "Original extension: $extension"
 
 
 
@@ -141,7 +141,7 @@ jobs:
           extension_url="${{ inputs.extension-url }}"
           extension_original=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
           extension="$extension_original"
-          
+                echo "Original extension: $extension"
           # Replace extension names for release
           case "$extension_original" in
             "base58-php-ext") extension="base58" ;;
@@ -154,7 +154,7 @@ jobs:
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
-          
+                echo "Final extension: $extension"
           php_version="${{ matrix.php-version }}"
           arch="${{ matrix.arch }}"
           ts="${{ matrix.ts }}"
@@ -189,7 +189,7 @@ jobs:
             -o "artifact_wrapper.zip"
 
           unzip "artifact_wrapper.zip"
-          
+           echo "Final 2 extension: $extension" 
           # Rename the artifact file to the new naming scheme
           if [ -f "${artifact_name}" ]; then
             if [ "${artifact_name}" != "${release_asset_name}" ]; then
