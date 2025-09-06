@@ -188,7 +188,9 @@ jobs:
           
           # Rename the artifact file to the new naming scheme
           if [ -f "${artifact_name}" ]; then
-            mv "${artifact_name}" "${release_asset_name}"
+            if [ "${artifact_name}" != "${release_asset_name}" ]; then
+              mv "${artifact_name}" "${release_asset_name}"
+            fi
           fi
           
           gh release upload "${release_tag}" "${release_asset_name}" \
