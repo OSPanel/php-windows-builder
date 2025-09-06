@@ -122,8 +122,6 @@ function Add-Package {
                 Move-Item -Path $_.FullName -Destination $currentDirectory -Force
             }
 
-            Remove-Item -Path $ArtifactsPath -Force -Recurse
-
             Set-GAGroup end
             Add-BuildLog tick "Packaging" "Extension $($Config.name) packaged successfully"
         } catch {
