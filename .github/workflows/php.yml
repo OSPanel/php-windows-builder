@@ -89,10 +89,12 @@ jobs:
           curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
             -H "Accept: application/vnd.github.v3+json" \
             "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o "php-${version}-${phpts}-${phparch}.zip"
+            -o "artifact_wrapper.zip"
+
+          unzip -o "artifact_wrapper.zip"
           
           if ! gh release view php-${version} -R ${{ github.repository }}; then
-            gh release create php-${version} "php-${version}-${phpts}-${phparch}.zip" -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+            gh release create php-${version} php-* -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
           else
-            gh release upload php-${version} "php-${version}-${phpts}-${phparch}.zip" -R ${{ github.repository }} --clobber
+            gh release upload php-${version} php-* -R ${{ github.repository }} --clobber
           fi
