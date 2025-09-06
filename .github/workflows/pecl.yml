@@ -154,6 +154,24 @@ jobs:
           gh release upload "${release_tag}" "${artifact_name}" \
           -R ${{ github.repository }} --clobber
 
+  cleanup-artifacts:
+    runs-on: ubuntu-latest
+    if: success()
+    needs: [pecl-release]
+    steps:
+      - name: Cleanup artifacts after successful release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Deleting artifacts after successful release ==="
+          artifact_ids=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
+          if [ -n "$artifact_ids" ]; then
+            for artifact_id in $artifact_ids; do
+              echo "Deleting artifact $artifact_id"
+              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id || true
+            done
+          fi
+        
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
