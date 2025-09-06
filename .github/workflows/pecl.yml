@@ -153,3 +153,73 @@ jobs:
           
           gh release upload "${release_tag}" "${artifact_name}" \
           -R ${{ github.repository }} --clobber
+
+  cleanup-release:
+    runs-on: ubuntu-latest
+    if: failure()
+    needs: [get-extension-matrix, extension, pecl-release]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup git
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Cleanup Release in Case of Failure
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+
+          extension=$(basename "${{ inputs.extension-url }}" | tr '[:upper:]' '[:lower:]')
+          ref="${{ inputs.extension-ref }}"
+          release_tag="${extension}-${ref}"
+
+          echo "=== Starting cleanup for release: $release_tag ==="
+
+          echo "=== Deleting all artifacts from this run ==="
+          artifact_ids=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
+          if [ -n "$artifact_ids" ]; then
+            for artifact_id in $artifact_ids; do
+              echo "Deleting artifact $artifact_id"
+              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id || true
+            done
+          else
+            echo "No artifacts found for this run"
+          fi
+
+          echo "=== Checking if release $release_tag exists ==="
+          if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Release $release_tag exists, proceeding with cleanup"
+            
+            echo "=== Deleting all assets from release $release_tag ==="
+            assets=$(gh release view "$release_tag" -R ${{ github.repository }} --json assets --jq '.assets[].name' 2>/dev/null || echo "")
+            if [ -n "$assets" ]; then
+              for asset in $assets; do
+                echo "Deleting asset: $asset"
+                gh release delete-asset "$release_tag" "$asset" -R ${{ github.repository }} -y || true
+              done
+            else
+              echo "No assets found in release $release_tag"
+            fi
+
+            echo "=== Deleting release $release_tag ==="
+            gh release delete "$release_tag" -R ${{ github.repository }} -y || true
+          else
+            echo "Release $release_tag does not exist, skipping release cleanup"
+          fi
+
+          echo "=== Checking if tag $release_tag exists ==="
+          if git rev-parse "refs/tags/$release_tag" >/dev/null 2>&1; then
+            echo "Tag $release_tag exists, deleting it"
+            git push origin ":refs/tags/$release_tag" || true
+          else
+            echo "Tag $release_tag does not exist, skipping tag deletion"
+          fi
+
+          echo "=== Cleanup completed successfully ==="
