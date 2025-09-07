@@ -155,14 +155,28 @@ jobs:
             if [[ -n "$row" ]]; then
               ext=$(echo "$row" | jq -r '.ext')
               ver=$(echo "$row" | jq -r '.ver')
-              tag="${ext}-${ver}"
+
+              case "$ext" in
+                "base58-php-ext") ext="base58" ;;
+                "dd-trace-php") ext="ddtrace" ;;
+                "msgpack-php") ext="msgpack" ;;
+                "php-firebird") ext="interbase" ;;
+                "php-ext-lz4") ext="lz4" ;;
+                "php-memcached") ext="memcached" ;;
+                "pecl-database-oci8") ext="oci8_19" ;;
+                "pecl-database-pdo_oci") ext="pdo_oci" ;;
+                "pecl-text-ssdeep") ext="ssdeep" ;;
+              esac
+
+              ver_clean=$(echo "$ver" | sed 's/^v//')
+
+              tag="${ext}-${ver_clean}"
               file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
               url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
               PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
             fi
           done <<< "$DOWNLOADS"
 
-          # Записываем JSON в файл, а затем читаем его в переменную окружения
           echo "$PLAN_JSON" > plan.json
           {
             echo "plan<<EOF"
@@ -176,7 +190,6 @@ jobs:
           $ErrorActionPreference = 'Continue'  # Изменено с 'Stop' на 'Continue'
           $target = "${{ steps.toolset.outputs.target }}"
 
-          # Декодируем JSON из base64 (если используете base64) или читаем напрямую
           $planJson = '${{ steps.plan.outputs.plan }}'
           $plan = $planJson | ConvertFrom-Json
 
@@ -192,7 +205,6 @@ jobs:
             Write-Host "Downloading $url -> $file"
 
             try {
-              # Сначала проверяем доступность URL
               $response = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
               if ($response.StatusCode -eq 200) {
                 Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
@@ -215,7 +227,6 @@ jobs:
             Write-Host "Failed extensions: $($failedExtensions -join ', ')" -ForegroundColor Yellow
           }
 
-          # Проверяем, что хотя бы что-то скачалось
           if ($downloadedCount -eq 0) {
             Write-Error "No extensions were downloaded successfully!" -ErrorAction Stop
           }
