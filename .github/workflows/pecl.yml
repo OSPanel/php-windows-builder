@@ -303,23 +303,6 @@ jobs:
 
           Write-Host "Uploading $releaseAssetName to release $releaseTag"
           gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
-
-          Write-Host "=== Deleting only related artifacts after successful release upload ==="
-          try {
-            $runId = "${{ github.run_id }}"
-            $repo = "${{ github.repository }}"
-            $candidateNames = @($artifactName, $artifactNameModern, $releaseAssetName) | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique
-            $artifacts = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[] | {id: .id, name: .name}' 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-            if ($null -eq $artifacts) {
-              Write-Host "No artifacts data returned for this run"
-            } else {
-              foreach ($a in $artifacts) {
-                if ($candidateNames -contains $a.name) {
-                  Write-Host "Deleting artifact ID $($a.id) with name '$($a.name)'"
-                  gh api -X DELETE "repos/$repo/actions/artifacts/$($a.id)" | Out-Null
-                }
-              }
-            }
           } catch {
             Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
           }
@@ -345,17 +328,6 @@ jobs:
 
           release_tag="${{ needs.prepare-release.outputs.tag }}"
           echo "=== Starting cleanup for release: $release_tag ==="
-
-          echo "=== Deleting all artifacts from this run ==="
-          artifact_ids=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
-          if [ -n "$artifact_ids" ]; then
-            for artifact_id in $artifact_ids; do
-              echo "Deleting artifact $artifact_id"
-              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id || true
-            done
-          else
-            echo "No artifacts found for this run"
-          fi
 
           echo "=== Checking if release $release_tag exists ==="
           if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
