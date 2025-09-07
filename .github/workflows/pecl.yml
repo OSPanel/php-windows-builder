@@ -229,7 +229,7 @@ jobs:
                 Write-Host "Moved $($_.Name) to ext folder"
               }
               
-              # Step 5 & 6: Process bin folder
+              # Step 5: Process bin folder
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
                 # Move sasl2\plugin_sasldb.dll from bin to root as sasl2\plugin_sasldb.dll
@@ -244,48 +244,31 @@ jobs:
                     Write-Host "Moved sasl2\plugin_sasldb.dll to root"
                   }
                 }
+                Remove-Item $binDir -Recurse -Force
+                Write-Host "Removed bin folder"
               }
-              
-              # Step 7: Remove ImageMagick files if extension is imagick
-              if ($extension -eq "imagick") {
-                $imagickPatterns = @("IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_*.dll")
-                foreach ($pattern in $imagickPatterns) {
-                  Get-ChildItem -Path $tempDir -Filter $pattern -Recurse | Remove-Item -Force
-                  Write-Host "Removed ImageMagick files: $pattern"
-                }
-              }
-              
-              # Step 8: Move all files and folders (except *.dll files and ext folder) to 3rd-party\$extension
-              Get-ChildItem -Path $tempDir | Where-Object { 
-                $_.Name -ne "ext" -and $_.Name -ne "3rd-party" -and $_.Name -ne "sasl2" -and
-                ($_.PSIsContainer -or $_.Extension -ne ".dll")
-              } | ForEach-Object {
-                $destPath = Join-Path $thirdPartyDir $_.Name
-                Move-Item $_.FullName $destPath -Force
-                Write-Host "Moved $($_.Name) to 3rd-party\$extension"
-              }
-              
-              # Step 9: Remove *.lib and *.pdb files recursively, remove bin and 3rd-party\imagick\config folders
+
+              # Step 6: Remove *.lib and *.pdb files recursively
               Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
               Write-Host "Removed *.lib and *.pdb files"
               
-              # Remove bin folder from 3rd-party\$extension if it was moved there
-              $binInThirdParty = Join-Path $thirdPartyDir "bin"
-              if (Test-Path $binInThirdParty) {
-                Remove-Item $binInThirdParty -Recurse -Force
-                Write-Host "Removed bin folder from 3rd-party\$extension"
+              # Step 7: Move all files and folders to 3rd-party\$extension
+              Get-ChildItem -Path $tempDir | Where-Object {
+                $_.Name -ne 'ext' -and
+                $_.Name -ne '3rd-party' -and
+                $_.Name -ne 'sasl2' -and
+                (
+                  $_.PSIsContainer -or
+                  ($_.Extension -notin @('.dll'))
+                ) -and
+                -not ( $extension -eq 'imagick' -and $_.PSIsContainer -and $_.Name -eq 'config' )
+              } | ForEach-Object {
+                  $destPath = Join-Path $thirdPartyDir $_.Name
+                  Move-Item -Path $_.FullName -Destination $destPath -Force
+                  Write-Host "Moved $($_.Name) to 3rd-party\$extension"
               }
               
-              # Remove 3rd-party\imagick\config if it exists
-              if ($extension -eq "imagick") {
-                $imagickConfigDir = Join-Path $thirdPartyDir "config"
-                if (Test-Path $imagickConfigDir) {
-                  Remove-Item $imagickConfigDir -Recurse -Force
-                  Write-Host "Removed 3rd-party\imagick\config folder"
-                }
-              }
-              
-              # Step 10: Create new archive
+              # Step 8: Create new archive
               Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
               
             } finally {
