@@ -123,90 +123,97 @@ jobs:
           auto-detect-args: true
           auto-detect-libs: true
           no-debug-symbols-ddtrace: true
-
-  pecl-release:
-    runs-on: ubuntu-latest
-    needs: [get-extension-matrix, extension]
-    strategy:
-      matrix: ${{fromJson(needs.get-extension-matrix.outputs.matrix)}}
-    steps:
-      - name: Create or Update PECL Release
+      - name: Upload to release immediately
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          extension_url="${{ inputs.extension-url }}"
-          extension_original=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          extension="$extension_original"
+          $extensionUrl = "${{ inputs.extension-url }}"
+          $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
+          $extension = $extensionOriginal
 
           # Replace extension names for release
-          case "$extension_original" in
-            "base58-php-ext") extension="base58" ;;
-            "dd-trace-php") extension="ddtrace" ;;
-            "msgpack-php") extension="msgpack" ;;
-            "php-firebird") extension="interbase" ;;
-            "php-ext-lz4") extension="lz4" ;;
-            "php-memcached") extension="memcached" ;;
-            "pecl-database-oci8") extension="oci8" ;;
-            "pecl-database-pdo_oci") extension="pdo_oci" ;;
-            "pecl-text-ssdeep") extension="ssdeep" ;;
-          esac
+          switch ($extensionOriginal) {
+            "base58-php-ext" { $extension = "base58" }
+            "dd-trace-php" { $extension = "ddtrace" }
+            "msgpack-php" { $extension = "msgpack" }
+            "php-firebird" { $extension = "interbase" }
+            "php-ext-lz4" { $extension = "lz4" }
+            "php-memcached" { $extension = "memcached" }
+            "pecl-database-oci8" { $extension = "oci8" }
+            "pecl-database-pdo_oci" { $extension = "pdo_oci" }
+            "pecl-text-ssdeep" { $extension = "ssdeep" }
+          }
 
-          php_version="${{ matrix.php-version }}"
-          arch="${{ matrix.arch }}"
-          ts="${{ matrix.ts }}"
-          ref="${{ inputs.extension-ref }}"
-          ref_clean=$(echo "$ref" | sed 's/^v//')
+          $phpVersion = "${{ matrix.php-version }}"
+          $arch = "${{ matrix.arch }}"
+          $ts = "${{ matrix.ts }}"
+          $ref = "${{ inputs.extension-ref }}"
+          $refClean = $ref -replace '^v', ''
 
-          case "$php_version" in
-            7.2|7.3|7.4) vs_version="vc15" ;;
-            8.0|8.1|8.2|8.3) vs_version="vs16" ;;
-            8.4|8.5) vs_version="vs17" ;;
-            *) vs_version="vs16" ;; # fallback
-          esac
+          $vsVersion = switch ($phpVersion) {
+            { $_ -in @("7.2", "7.3", "7.4") } { "vc15" }
+            { $_ -in @("8.0", "8.1", "8.2", "8.3") } { "vs16" }
+            { $_ -in @("8.4", "8.5") } { "vs17" }
+            default { "vs16" }
+          }
           
           # Artifact name uses original extension name and ref with 'v'
-          artifact_name="php_${extension_original}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
-          artifact_name_modern="php_${extension}-${ref}-${php_version}-${ts}-${vs_version}-${arch}.zip"
-          final_name="${artifact_name}"
+          $artifactName = "php_${extensionOriginal}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
+          $artifactNameModern = "php_${extension}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
+          
           # Release uses new extension name and ref without 'v'
-          release_tag="${extension}-${ref_clean}"
-          release_asset_name="php_${extension}-${ref_clean}-${php_version}-${ts}-${vs_version}-${arch}.zip"
+          $releaseTag = "${extension}-${refClean}"
+          $releaseAssetName = "php_${extension}-${refClean}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
           
-          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
-
-          if [ -z "$artifact_id" ]; then            
-            artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts \
-            --jq ".artifacts[] | select(.name==\"${artifact_name_modern}\") | .id")   
-            final_name="${artifact_name_modern}"
-            if [ -z "$artifact_id" ]; then
-              echo "Artifact ${artifact_name} not found"
-              exit 1
-            fi
-          fi
-
-          curl -L \
-            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o "artifact_wrapper.zip"
-
-          unzip "artifact_wrapper.zip"
-
-          # Rename the artifact file to the new naming scheme
-          if [ -f "${final_name}" ]; then
-            if [ "${final_name}" != "${release_asset_name}" ]; then
-              mv "${final_name}" "${release_asset_name}"
-            fi
-          fi
+          # Найти собранный ZIP файл с оригинальным или современным именем
+          $searchPaths = @(".", "C:\b", ".\artifacts", ".\build")
+          $builtFile = $null
+          $finalName = $artifactName
           
-          gh release upload "${release_tag}" "${release_asset_name}" \
-          -R ${{ github.repository }} --clobber
-
+          foreach ($searchPath in $searchPaths) {
+            if (Test-Path $searchPath) {
+              # Ищем файл с оригинальным именем
+              $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactName -File -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($foundFile) {
+                $builtFile = $foundFile.FullName
+                $finalName = $artifactName
+                break
+              }
+              
+              # Ищем файл с современным именем
+              $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactNameModern -File -ErrorAction SilentlyContinue | Select-Object -First 1
+              if ($foundFile) {
+                $builtFile = $foundFile.FullName
+                $finalName = $artifactNameModern
+                break
+              }
+            }
+          }
+          
+          if ($builtFile -and (Test-Path $builtFile)) {
+            Write-Host "Found built file: $builtFile"
+            
+            # Rename the artifact file to the new naming scheme if needed
+            if ($finalName -ne $releaseAssetName) {
+              Copy-Item $builtFile $releaseAssetName
+            } else {
+              $releaseAssetName = $builtFile
+            }
+            
+            Write-Host "Uploading $releaseAssetName to release $releaseTag"
+            gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
+          } else {
+            Write-Host "No built ZIP file found! Searched for: $artifactName, $artifactNameModern"
+            Write-Host "Current directory contents:"
+            Get-ChildItem -Recurse -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
+            exit 1
+          }
+          
   cleanup-artifacts:
     runs-on: ubuntu-latest
     if: success()
-    needs: [pecl-release]
+    needs: [extension]
     steps:
       - name: Cleanup artifacts after successful release
         env:
@@ -224,7 +231,7 @@ jobs:
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
-    needs: [get-extension-matrix, extension, pecl-release]
+    needs: [get-extension-matrix, extension]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
