@@ -75,12 +75,13 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Ensure release exists
+      - name: Ensure git tag exists and create release if needed
         shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
+
           extension_url="${{ inputs.extension-url }}"
           extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
           # Replace some repository names with extension names used in releases
@@ -99,11 +100,34 @@ jobs:
           ref="${{ inputs.extension-ref }}"
           # Strip 'v' prefix from version for the release tag
           ref_clean="$(echo "$ref" | sed 's/^v//')"
-          release_tag="${extension}-${ref_clean}"
+          tag="${extension}-${ref_clean}"
 
-          # Create release if it does not exist
-          if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            gh release create "${release_tag}" \
+          # Configure git identity for tagging
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          # Make sure tags are up to date
+          git fetch --tags --force
+
+          # Create annotated tag locally if missing
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "Git tag $tag already exists locally."
+          else
+            git tag -a "$tag" -m "$tag"
+            echo "Created annotated tag $tag"
+          fi
+
+          # Push tag to origin if not present there
+          if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
+            echo "Git tag $tag already exists on origin."
+          else
+            git push origin "refs/tags/$tag"
+            echo "Pushed tag $tag to origin."
+          fi
+
+          # Create release if it does not exist yet (now tied to a real git tag -> Verified)
+          if ! gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            gh release create "${tag}" \
               -t "${extension} ${ref_clean}" \
               -n "Release of PECL extension '${extension}' version ${ref_clean}" \
               -R ${{ github.repository }}
@@ -134,6 +158,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          # Make non-terminating errors terminate the step to avoid silent failures
           $ErrorActionPreference = "Stop"
 
           $extensionUrl = "${{ inputs.extension-url }}"
@@ -366,12 +391,8 @@ jobs:
             echo "Release $release_tag does not exist, skipping release cleanup"
           fi
 
-          echo "=== Checking if tag $release_tag exists ==="
-          if git rev-parse "refs/tags/$release_tag" >/dev/null 2>&1; then
-            echo "Tag $release_tag exists, deleting it"
-            git push origin ":refs/tags/$release_tag" || true
-          else
-            echo "Tag $release_tag does not exist, skipping tag deletion"
-          fi
+          echo "=== Deleting tag ref (force, covers unverified/virtual tags) ==="
+          # Remove the git ref for the tag via API; harmless if it doesn't exist
+          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
 
           echo "=== Cleanup completed successfully ==="
