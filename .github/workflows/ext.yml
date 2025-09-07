@@ -1,4 +1,4 @@
-name: 🚀 Build PHP Extensions Packs
+name: 🔧 Build PHP Extensions Packs
 run-name: 🚀 Build PHP Ext Packs ${{ inputs.php-versions || 'all-in-matrix' }}
 
 on:
@@ -11,10 +11,6 @@ on:
         description: 'Build types: ts, nts or ts,nts'
         required: false
         default: 'ts,nts'
-      upload:
-        description: 'Upload to release (true/false)'
-        required: false
-        default: 'true'
 
 permissions:
   contents: write
@@ -25,9 +21,26 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.mk-matrix.outputs.matrix }}
+      release-tag: ${{ steps.release-info.outputs.tag }}
+      release-title: ${{ steps.release-info.outputs.title }}
     steps:
       - name: 🛡️ Checkout repository
         uses: actions/checkout@v4
+
+      - name: 🏷️ Generate release info
+        id: release-info
+        shell: bash
+        run: |
+          # Generate timestamp-based release tag
+          TIMESTAMP=$(date -u '+%Y.%m.%d.%H.%M')
+          TAG="ext-pack-${TIMESTAMP}"
+          TITLE="Extensions Pack for PHP v${TIMESTAMP}"
+
+          echo "🏷️ Release tag: $TAG"
+          echo "📝 Release title: $TITLE"
+
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "title=$TITLE" >> "$GITHUB_OUTPUT"
 
       - name: 🧮 Generate matrix from matrix.json
         id: mk-matrix
@@ -102,7 +115,6 @@ jobs:
     name: 🔧 Build ${{ matrix.php }}-${{ matrix.ts }}
     runs-on: windows-2022
     needs: generate-matrix
-    if: ${{ always() }} # allow parallel independent releases
     strategy:
       fail-fast: false
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
@@ -356,60 +368,14 @@ jobs:
 
           Write-Output "zip=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: 🚀 Upload to release
-        if: ${{ inputs.upload == 'true' }}
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-          PHP="${{ matrix.php }}"
-          TS="${{ matrix.ts }}"
-          ZIP="${{ steps.pack.outputs.zip }}"
-
-          echo "🚀 Preparing release upload..."
-          echo "📦 Archive: $ZIP"
-
-          # Generate release tag: ext-pack-<MAJOR.MINOR>-<ts>
-          TAG="ext-pack-${PHP}-${TS}"
-          TITLE="🔧 Extensions Pack for PHP ${PHP} (${TS})"
-          BODY="📦 PHP extensions pack built from matrix.json for PHP ${PHP} (${TS}) architecture.
-
-          🎯 **Target Configuration:**
-          - PHP Version: ${PHP}
-          - Thread Safety: ${TS}
-          - Architecture: x64
-          - Platform: Windows
-
-          ⚡ **Installation:**
-          Extract the archive contents to your PHP installation directory.
-
-          🤖 **Auto-generated** by GitHub Actions workflow."
-
-          echo "🏷️ Release tag: $TAG"
-
-          # Create or update release
-          if ! gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "✨ Creating new release: $TAG"
-            gh release create "$TAG" "$ZIP" \
-              -t "$TITLE" \
-              -n "$BODY" \
-              -R "${{ github.repository }}"
-            echo "✅ Release created successfully"
-          else
-            echo "🔄 Updating existing release: $TAG"
-            gh release upload "$TAG" "$ZIP" --clobber -R "${{ github.repository }}"
-            echo "✅ Release updated successfully"
-          fi
-
-          echo ""
-          echo "🎉 Upload completed successfully!"
-          echo "📊 Repository: ${{ github.repository }}"
-          echo "🏷️ Release: $TAG"
-          echo "📦 Archive: $ZIP"
+      - name: 📤 Upload artifact for release
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.zip }}
+          path: ${{ steps.pack.outputs.zip }}
+          retention-days: 1
 
       - name: ✅ Build completed
-        if: success()
         run: |
           echo "🎉 Build completed successfully!"
           echo "📊 Configuration: PHP ${{ matrix.php }} (${{ matrix.ts }})"
@@ -417,4 +383,115 @@ jobs:
           echo "📦 Archive: ${{ steps.pack.outputs.zip }}"
           echo "⏰ Completion time: $(date)"
           echo ""
-          echo "🚀 Extension pack is ready for use!"
+          echo "🚀 Extension pack ready for release!"
+
+  create-unified-release:
+    name: 🚀 Create Unified Release
+    runs-on: ubuntu-latest
+    needs: [generate-matrix, build-and-release]
+    if: always() && (needs.build-and-release.result == 'success' || contains(needs.build-and-release.result, 'success'))
+    steps:
+      - name: 🛡️ Checkout repository
+        uses: actions/checkout@v4
+
+      - name: 📥 Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./artifacts
+
+      - name: 📋 List downloaded artifacts
+        shell: bash
+        run: |
+          echo "📋 Downloaded artifacts:"
+          find ./artifacts -type f -name "*.zip" | while read -r file; do
+            size=$(du -h "$file" | cut -f1)
+            echo "📦 $(basename "$file") - $size"
+          done
+
+      - name: 🚀 Create unified release
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          RELEASE_TAG="${{ needs.generate-matrix.outputs.release-tag }}"
+          RELEASE_TITLE="${{ needs.generate-matrix.outputs.release-title }}"
+
+          echo "🚀 Creating unified release..."
+          echo "🏷️ Tag: $RELEASE_TAG"
+          echo "📝 Title: $RELEASE_TITLE"
+
+          # Count artifacts
+          ARTIFACT_COUNT=$(find ./artifacts -type f -name "*.zip" | wc -l)
+          echo "📦 Found $ARTIFACT_COUNT extension packs to release"
+
+          if [ "$ARTIFACT_COUNT" -eq 0 ]; then
+            echo "❌ No artifacts found to release"
+            exit 1
+          fi
+
+          # Generate release body
+          RELEASE_BODY="🔧 **PHP Extensions Pack Collection**
+
+          This release contains pre-compiled PHP extension packs for Windows (x64) across multiple PHP versions and thread safety modes.
+
+          📦 **Package Contents:**
+          - $ARTIFACT_COUNT extension packs
+          - Support for multiple PHP versions (7.x, 8.x)
+          - Both Thread Safe (TS) and Non-Thread Safe (NTS) variants
+          - Compiled with appropriate Visual Studio toolsets
+
+          ⚡ **Quick Installation:**
+          1. Download the appropriate pack for your PHP version and thread safety mode
+          2. Extract the archive to your PHP installation directory
+          3. Restart your web server
+
+          🎯 **Naming Convention:**
+          \`php-ext-pack-{VERSION}-{TS/NTS}-Win32-{TOOLSET}-x64.zip\`
+
+          🛠️ **Toolset Mapping:**
+          - \`vc15\` - Visual Studio 2017 (PHP 7.x)
+          - \`vs16\` - Visual Studio 2019 (PHP 8.0-8.3)
+          - \`vs17\` - Visual Studio 2022 (PHP 8.4+)
+
+          🤖 **Auto-generated** by GitHub Actions on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+          # Delete existing release if it exists
+          if gh release view "$RELEASE_TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "🗑️ Deleting existing release: $RELEASE_TAG"
+            gh release delete "$RELEASE_TAG" -R "${{ github.repository }}" -y
+          fi
+
+          # Create new release
+          echo "✨ Creating new release: $RELEASE_TAG"
+          gh release create "$RELEASE_TAG" \
+            -t "$RELEASE_TITLE" \
+            -n "$RELEASE_BODY" \
+            -R "${{ github.repository }}"
+
+          # Upload all artifacts
+          echo "📤 Uploading artifacts to release..."
+          counter=0
+          find ./artifacts -type f -name "*.zip" | while read -r file; do
+            counter=$((counter + 1))
+            filename=$(basename "$file")
+            echo "📦 [$counter/$ARTIFACT_COUNT] Uploading: $filename"
+            gh release upload "$RELEASE_TAG" "$file" -R "${{ github.repository }}"
+            echo "✅ Uploaded: $filename"
+          done
+
+          echo ""
+          echo "🎉 Unified release created successfully!"
+          echo "📊 Repository: ${{ github.repository }}"
+          echo "🏷️ Release: $RELEASE_TAG"
+          echo "📦 Artifacts: $ARTIFACT_COUNT extension packs"
+          echo "🌐 URL: https://github.com/${{ github.repository }}/releases/tag/$RELEASE_TAG"
+
+      - name: 🎉 Release completed
+        run: |
+          echo "🎉 All extension packs published successfully!"
+          echo "📊 Release: ${{ needs.generate-matrix.outputs.release-tag }}"
+          echo "⏰ Completion time: $(date)"
+          echo ""
+          echo "🚀 Extension packs are now available for download!"
