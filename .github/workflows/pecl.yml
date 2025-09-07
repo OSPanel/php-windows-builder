@@ -1,17 +1,14 @@
 name: Build PHP Extension From PECL
-run-name: Build PHP Extension ${{ inputs.extension-url || inputs.extension-name }}, ${{ inputs.extension-ref }}
+run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
 
 on:
   workflow_dispatch:
     inputs:
       extension-url:
-        description: 'Extension URL (full URL) — либо используйте extension-name'
-        required: false
-      extension-name:
-        description: 'Extension source name from matrix (если не URL)'
-        required: false
+        description: 'Extension URL'
+        required: true
       extension-ref:
-        description: 'Extension ref (tag/branch/commit in extension repo)'
+        description: 'Extension ref'
         required: true
       php-version-list:
         description: 'PHP versions to build'
@@ -55,10 +52,11 @@ permissions:
   contents: write
 
 jobs:
+  # 1) Подготовка: создаём аннотированный git-тег и релиз до запуска матрицы
   prepare-release:
     runs-on: ubuntu-latest
     concurrency:
-      group: prepare-${{ inputs.extension-url || inputs.extension-name }}-${{ inputs.extension-ref }}
+      group: prepare-${{ inputs.extension-url }}-${{ inputs.extension-ref }}
       cancel-in-progress: false
     outputs:
       tag: ${{ steps.out.outputs.tag }}
@@ -68,7 +66,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Compute names and ensure release with Verified tag (no local tags)
+      - name: Compute names, ensure release with Verified tag (no local tag push)
         id: prep
         shell: bash
         env:
@@ -76,21 +74,9 @@ jobs:
         run: |
           set -euo pipefail
 
-          # Determine extension source input (URL or name)
-          extension_input_url="${{ inputs.extension-url }}"
-          extension_input_name="${{ inputs.extension-name }}"
-          if [ -n "${extension_input_url}" ]; then
-            extension_source="${extension_input_url}"
-            extension="$(basename "$extension_input_url" | tr '[:upper:]' '[:lower:]')"
-          elif [ -n "${extension_input_name}" ]; then
-            extension_source="${extension_input_name}"
-            extension="$(basename "$extension_input_name" | tr '[:upper:]' '[:lower:]')"
-          else
-            echo "Either 'extension-url' or 'extension-name' must be provided" >&2
-            exit 1
-          fi
+          extension_url="${{ inputs.extension-url }}"
+          extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
 
-          # Normalize extension display name
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -110,28 +96,26 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Ensure we operate on the current checked-out commit
+          # Точка привязки релиза/тага — текущий HEAD репозитория (можете подставить другой SHA при необходимости)
           target_sha="$(git rev-parse HEAD)"
 
-          # If release exists — reuse it (tag already present and should be OK)
-          if gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            echo "Release ${tag} already exists"
-          else
-            # If a tag exists on origin, it could be a non-Verified tag from earlier runs.
-            # Drop it, then let GitHub recreate it as Verified during release creation.
+          # Ничего не тэгируем локально. Пусть GitHub создаёт тег сам при создании релиза.
+          # Если релиз уже есть — используем его как есть.
+          if ! gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            # Если тег уже существует отдельно (мог создать другой ран), просто создадим релиз, привязанный к нему.
             if git ls-remote --tags origin | grep -qE "refs/tags/${tag}$"; then
-              echo "Tag ${tag} exists on origin. Deleting to recreate it as Verified..."
-              gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/${tag}" || true
-              git fetch --tags --force || true
-              git push origin ":refs/tags/${tag}" || true
+              gh release create "${tag}" \
+                -t "${extension} ${ref_clean}" \
+                -n "Release of PECL extension '${extension}' version ${ref_clean}" \
+                -R ${{ github.repository }}
+            else
+              # Тега нет — GitHub создаст Verified tag сам на target_sha
+              gh release create "${tag}" \
+                -t "${extension} ${ref_clean}" \
+                -n "Release of PECL extension '${extension}' version ${ref_clean}" \
+                --target "${target_sha}" \
+                -R ${{ github.repository }}
             fi
-
-            # Create release — GitHub will create a Verified tag at target_sha
-            gh release create "${tag}" \
-              -t "${extension} ${ref_clean}" \
-              -n "Release of PECL extension '${extension}' version ${ref_clean}" \
-              --target "${target_sha}" \
-              -R ${{ github.repository }}
           fi
 
           echo "extension=$extension" >> "$GITHUB_OUTPUT"
@@ -145,6 +129,7 @@ jobs:
           echo "ref_clean=${{ steps.prep.outputs.ref_clean }}" >> "$GITHUB_OUTPUT"
           echo "tag=${{ steps.prep.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
+  # 2) Генерация матрицы (после подготовки тега/релиза)
   get-extension-matrix:
     needs: prepare-release
     runs-on: ubuntu-latest
@@ -158,12 +143,12 @@ jobs:
         uses: ./extension-matrix
         with:
           extension-url: ${{ inputs.extension-url }}
-          extension-name: ${{ inputs.extension-name }}
           extension-ref: ${{ inputs.extension-ref }}
           php-version-list: ${{ inputs.php-version-list }}
           arch-list: ${{ inputs.arch-list }}
           ts-list: ${{ inputs.ts-list }}
 
+  # 3) Сборка и загрузка ассетов в подготовленный релиз
   extension:
     needs: [prepare-release, get-extension-matrix]
     runs-on: ${{ matrix.os }}
@@ -178,7 +163,6 @@ jobs:
         uses: ./extension
         with:
           extension-url: ${{ inputs.extension-url }}
-          extension-name: ${{ inputs.extension-name }}
           extension-ref: ${{ inputs.extension-ref }}
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
@@ -203,15 +187,7 @@ jobs:
           $ErrorActionPreference = "Stop"
 
           $extensionUrl = "${{ inputs.extension-url }}"
-          $extensionName = "${{ inputs.extension-name }}"
-          if ([string]::IsNullOrWhiteSpace($extensionUrl) -and [string]::IsNullOrWhiteSpace($extensionName)) {
-            throw "Either extension-url or extension-name must be provided"
-          }
-          if (-not [string]::IsNullOrWhiteSpace($extensionUrl)) {
-            $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
-          } else {
-            $extensionOriginal = (Split-Path $extensionName -Leaf).ToLower()
-          }
+          $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
           $extension = $extensionOriginal
 
           switch ($extensionOriginal) {
@@ -325,6 +301,7 @@ jobs:
           Write-Host "Uploading $releaseAssetName to release $releaseTag"
           gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
 
+  # 4) Уборка релиза/тега при общем фейле (без удаления артефактов Actions)
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
@@ -342,15 +319,32 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -e
+
           release_tag="${{ needs.prepare-release.outputs.tag }}"
+          echo "=== Starting cleanup for release: $release_tag ==="
+
+          echo "=== Checking if release $release_tag exists ==="
           if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Release $release_tag exists, proceeding with cleanup"
+
+            echo "=== Deleting all assets from release $release_tag ==="
             assets=$(gh release view "$release_tag" -R ${{ github.repository }} --json assets --jq '.assets[].name' 2>/dev/null || echo "")
             if [ -n "$assets" ]; then
               for asset in $assets; do
+                echo "Deleting asset: $asset"
                 gh release delete-asset "$release_tag" "$asset" -R ${{ github.repository }} -y || true
               done
+            else
+              echo "No assets found in release $release_tag"
             fi
+
+            echo "=== Deleting release $release_tag ==="
             gh release delete "$release_tag" -R ${{ github.repository }} -y || true
+          else
+            echo "Release $release_tag does not exist, skipping release cleanup"
           fi
-          # Always try to remove the tag as a ref
+
+          echo "=== Deleting tag ref (force, covers unverified/virtual tags) ==="
           gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
+
+          echo "=== Cleanup completed successfully ==="
