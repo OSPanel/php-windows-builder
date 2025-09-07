@@ -52,8 +52,7 @@ permissions:
   contents: write
 
 jobs:
-  # 1) Подготовка: сериализованно создаём git-тег (аннотированный) и релиз,
-  #    чтобы он был Verified, и чтобы не было гонок с матрицей.
+  # 1) Подготовка: создаём аннотированный git-тег и релиз до запуска матрицы
   prepare-release:
     runs-on: ubuntu-latest
     concurrency:
@@ -78,7 +77,7 @@ jobs:
           extension_url="${{ inputs.extension-url }}"
           extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
 
-          # Нормализуем имя расширения (как в ваших шагах)
+          # Нормализация имён некоторых репозиториев под имя расширения
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -132,7 +131,7 @@ jobs:
           echo "ref_clean=${{ steps.prep.outputs.ref_clean }}" >> "$GITHUB_OUTPUT"
           echo "tag=${{ steps.prep.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
-  # 2) Генерация матрицы после того, как тег и релиз уже существуют.
+  # 2) Генерация матрицы (после подготовки тега/релиза)
   get-extension-matrix:
     needs: prepare-release
     runs-on: ubuntu-latest
@@ -151,7 +150,7 @@ jobs:
           arch-list: ${{ inputs.arch-list }}
           ts-list: ${{ inputs.ts-list }}
 
-  # 3) Сборка и немедленная загрузка ассетов в уже подготовленный релиз.
+  # 3) Сборка и загрузка ассетов в подготовленный релиз
   extension:
     needs: [prepare-release, get-extension-matrix]
     runs-on: ${{ matrix.os }}
@@ -304,27 +303,7 @@ jobs:
           Write-Host "Uploading $releaseAssetName to release $releaseTag"
           gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
 
-          Write-Host "=== Deleting only related artifacts after successful release upload ==="
-          try {
-            $runId = "${{ github.run_id }}"
-            $repo = "${{ github.repository }}"
-            $candidateNames = @($artifactName, $artifactNameModern, $releaseAssetName) | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique
-            $artifacts = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[] | {id: .id, name: .name}' 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
-            if ($null -eq $artifacts) {
-              Write-Host "No artifacts data returned for this run"
-            } else {
-              foreach ($a in $artifacts) {
-                if ($candidateNames -contains $a.name) {
-                  Write-Host "Deleting artifact ID $($a.id) with name '$($a.name)'"
-                  gh api -X DELETE "repos/$repo/actions/artifacts/$($a.id)" | Out-Null
-                }
-              }
-            }
-          } catch {
-            Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
-          }
-
-  # 4) Уборка релиза/тега при сбое сборок.
+  # 4) Уборка релиза/тега при общем фейле (без удаления артефактов Actions)
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
@@ -345,17 +324,6 @@ jobs:
 
           release_tag="${{ needs.prepare-release.outputs.tag }}"
           echo "=== Starting cleanup for release: $release_tag ==="
-
-          echo "=== Deleting all artifacts from this run ==="
-          artifact_ids=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
-          if [ -n "$artifact_ids" ]; then
-            for artifact_id in $artifact_ids; do
-              echo "Deleting artifact $artifact_id"
-              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id || true
-            done
-          else
-            echo "No artifacts found for this run"
-          fi
 
           echo "=== Checking if release $release_tag exists ==="
           if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
