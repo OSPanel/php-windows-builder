@@ -1,0 +1,281 @@
+name: Build PHP Extensions Packs
+run-name: Build PHP Ext Packs ${{ inputs.php-versions || 'all-in-matrix' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      php-versions:
+        description: 'Which PHP versions to build (comma-separated), e.g.: 7.2,7.4,8.1,8.3. Default: all found in matrix.json'
+        required: false
+      ts:
+        description: 'Build types: ts, nts or ts,nts'
+        required: false
+        default: 'ts,nts'
+      release-tag:
+        description: 'Release tag (if not provided, php-ext-pack-<run_id> will be used)'
+        required: false
+      upload:
+        description: 'Upload to release (true/false)'
+        required: false
+        default: 'true'
+
+permissions:
+  contents: write
+
+jobs:
+  generate-matrix:
+    name: Generate matrix from matrix.json
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.mk-matrix.outputs.matrix }}
+      versions: ${{ steps.mk-matrix.outputs.versions }}
+      tslist: ${{ steps.mk-matrix.outputs.tslist }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - id: mk-matrix
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # Inputs
+          PHP_VERSIONS_INPUT="${{ inputs.php-versions || '' }}"
+          TS_INPUT="${{ inputs.ts || 'ts,nts' }}"
+
+          # Collect PHP versions from matrix.json (keys of .[].ver)
+          ALL_PHP_VERS=$(
+            jq -r '
+              to_entries
+              | map(.value.ver | keys[]) 
+              | unique
+              | .[]
+            ' matrix.json
+          )
+
+          if [[ -n "$PHP_VERSIONS_INPUT" ]]; then
+            # User-provided list
+            IFS=',' read -ra REQ <<< "$PHP_VERSIONS_INPUT"
+            PHP_VERS=()
+            for v in "${REQ[@]}"; do
+              v_trim=$(echo "$v" | xargs)
+              # Allow only versions present in matrix.json
+              if printf '%s\n' "${ALL_PHP_VERS[@]}" | grep -qx "$v_trim"; then
+                PHP_VERS+=("$v_trim")
+              else
+                echo "Warning: PHP version $v_trim not found in matrix.json — skipped" >&2
+              fi
+            done
+          else
+            # Use all versions from matrix.json
+            PHP_VERS=(${ALL_PHP_VERS})
+          fi
+
+          if [[ ${#PHP_VERS[@]} -eq 0 ]]; then
+            echo "No PHP versions found to build" >&2
+            exit 1
+          fi
+
+          IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
+
+          # Build an include-matrix for PHP versions and TS types
+          MATRIX_JSON='{"include":['
+          SEP=""
+          for phpv in "${PHP_VERS[@]}"; do
+            for ts in "${TS_VALUES[@]}"; do
+              MATRIX_JSON+="${SEP}{\"php\":\"${phpv}\",\"ts\":\"${ts}\"}"
+              SEP=","
+            done
+          done
+          MATRIX_JSON+="]}"
+
+          echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
+          echo "versions=$(printf '%s\n' "${PHP_VERS[@]}" | jq -R . | jq -s .)" >> "$GITHUB_OUTPUT"
+          echo "tslist=$(printf '%s\n' "${TS_VALUES[@]}" | jq -R . | jq -s .)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build pack ${{ matrix.php }}-${{ matrix.ts }}
+    runs-on: windows-2022
+    needs: generate-matrix
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Determine toolset and naming
+        id: toolset
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHP="${{ matrix.php }}"
+          TS="${{ matrix.ts }}"
+
+          # Compiler map:
+          # 7.x => vc15
+          # 8.0–8.3 => vs16
+          # 8.4–8.5 => vs17
+          major="${PHP%%.*}"
+          minor="${PHP#*.}"
+
+          tool=""
+          if [[ "$major" == "7" ]]; then
+            tool="vc15"
+          else
+            # 8.x
+            if [[ "$minor" -ge 4 ]]; then
+              tool="vs17"
+            else
+              tool="vs16"
+            fi
+          fi
+
+          # Target directory
+          TARGET_DIR="php-${PHP}-${TS}"
+          echo "tool=$tool" >> "$GITHUB_OUTPUT"
+          echo "target=$TARGET_DIR" >> "$GITHUB_OUTPUT"
+
+      - name: Create target directory
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path "${{ steps.toolset.outputs.target }}" | Out-Null
+
+      - name: Build download plan from matrix.json
+        id: plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          PHP="${{ matrix.php }}"
+          TS="${{ matrix.ts }}"
+          TOOL="${{ steps.toolset.outputs.tool }}"
+
+          # Generate extension list (name + version) for this PHP line
+          # Skip empty versions ("")
+          # File/URL template:
+          #   https://github.com/OSPanel/php-windows-builder/releases/download/<ext>-<ver>/php_<ext>-<ver>-<php>-<ts>-<tool>-x64.zip
+          #
+          # Matches provided examples for zstd and oci8_19.
+
+          DOWNLOADS=$(jq -r --arg php "$PHP" '
+            to_entries
+            | map({
+                ext: .key,
+                ver: (.value.ver[$php] // "")
+              })
+            | map(select(.ver != ""))[] 
+            | @json
+          ' matrix.json)
+
+          PLAN_JSON='[]'
+          while IFS= read -r row; do
+            ext=$(echo "$row" | jq -r '.ext')
+            ver=$(echo "$row" | jq -r '.ver')
+
+            tag="${ext}-${ver}"
+            file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
+            url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
+
+            PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
+          done <<< "$DOWNLOADS"
+
+          echo "plan=$PLAN_JSON" >> "$GITHUB_OUTPUT"
+
+      - name: Download all extension archives
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = "${{ steps.toolset.outputs.target }}"
+          $plan = '${{ steps.plan.outputs.plan }}' | ConvertFrom-Json
+          if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
+
+          foreach ($item in $plan) {
+            $url = $item.url
+            $file = Join-Path $target $item.file
+            Write-Host "Downloading $url -> $file"
+            try {
+              Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+            } catch {
+              Write-Warning "Failed to download $url"
+              throw
+            }
+          }
+
+      - name: Extract all archives and remove zips
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $target = "${{ steps.toolset.outputs.target }}"
+          Get-ChildItem -Path $target -Filter *.zip | ForEach-Object {
+            Write-Host "Unzip: $($_.FullName)"
+            Expand-Archive -LiteralPath $_.FullName -DestinationPath $target -Force
+          }
+          Get-ChildItem -Path $target -Filter *.zip | Remove-Item -Force
+
+      - name: Pack result
+        id: pack
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $php = "${{ matrix.php }}"
+          $ts  = "${{ matrix.ts }}"
+          $tool = "${{ steps.toolset.outputs.tool }}"
+          $target = "${{ steps.toolset.outputs.target }}"
+
+          # Archive name: php-ext-pack-<php>-<ts>-Win32-<tool>-x64.zip
+          $zipName = "php-ext-pack-$php-$ts-Win32-$tool-x64.zip"
+
+          if (Test-Path $zipName) { Remove-Item $zipName -Force }
+          Compress-Archive -Path (Join-Path $target '*') -DestinationPath $zipName
+
+          Write-Output "zip=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Upload pack as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.pack.outputs.zip }}
+          path: ${{ steps.pack.outputs.zip }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    name: Publish release
+    runs-on: ubuntu-latest
+    needs: [generate-matrix, build]
+    if: ${{ inputs.upload == 'true' }}
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: ./dist
+
+      - name: List artifacts
+        run: |
+          ls -laR ./dist
+
+      - name: Create or update GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          TAG="${{ inputs.release-tag }}"
+          if [[ -z "$TAG" ]]; then
+            TAG="php-ext-pack-${{ github.run_id }}"
+          fi
+
+          shopt -s globstar nullglob
+          files=(./dist/**/*.zip)
+          if [[ ${#files[@]} -eq 0 ]]; then
+            echo "No files found for release" >&2
+            exit 1
+          fi
+
+          if ! gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            gh release create "$TAG" "${files[@]}" \
+              -t "$TAG" \
+              -n "PHP extensions packs built from matrix.json" \
+              -R "${{ github.repository }}"
+          else
+            gh release upload "$TAG" "${files[@]}" --clobber -R "${{ github.repository }}"
+          fi
