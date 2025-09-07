@@ -79,7 +79,7 @@ jobs:
             "php-firebird") extension="interbase" ;;
             "php-ext-lz4") extension="lz4" ;;
             "php-memcached") extension="memcached" ;;
-            "pecl-database-oci8") extension="oci8" ;;
+            "pecl-database-oci8") extension="oci8_19" ;;
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
@@ -140,7 +140,7 @@ jobs:
             "php-firebird" { $extension = "interbase" }
             "php-ext-lz4" { $extension = "lz4" }
             "php-memcached" { $extension = "memcached" }
-            "pecl-database-oci8" { $extension = "oci8" }
+            "pecl-database-oci8" { $extension = "oci8_19" }
             "pecl-database-pdo_oci" { $extension = "pdo_oci" }
             "pecl-text-ssdeep" { $extension = "ssdeep" }
           }
@@ -257,7 +257,7 @@ jobs:
             "php-firebird") extension="interbase" ;;
             "php-ext-lz4") extension="lz4" ;;
             "php-memcached") extension="memcached" ;;
-            "pecl-database-oci8") extension="oci8" ;;
+            "pecl-database-oci8") extension="oci8_19" ;;
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
