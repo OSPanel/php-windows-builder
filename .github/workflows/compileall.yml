@@ -26,7 +26,14 @@ jobs:
         MAX_COUNT: ${{ github.event.inputs.max_extensions }}
       run: |
         #!/bin/bash
+
+        # Enable debug mode and error handling
         set -e
+        set -x
+
+        echo "🔧 Debug: Starting script execution"
+        echo "🔧 Debug: MAX_COUNT=$MAX_COUNT"
+        echo "🔧 Debug: GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
 
         # Function to trigger workflow for a single extension
         trigger_extension_workflow() {
@@ -42,11 +49,13 @@ jobs:
             fi
 
             # Get repository URL/name
-            repo=$(jq -r ".$extension_name.source // empty" "extension/BuildPhpExtension/config/matrix.json")
-            if [ -z "$repo" ]; then
+            repo=$(jq -r ".$extension_name.source // empty" "extension/BuildPhpExtension/config/matrix.json" 2>/dev/null || echo "")
+            if [ -z "$repo" ] || [ "$repo" = "null" ]; then
                 echo "❌ Repository source not found for $extension_name"
                 return 1
             fi
+
+            echo "🔧 Debug: Extension $extension_name has source: $repo"
 
             # Process PHP versions
             IFS=',' read -ra php_version_list <<< "$php_versions"
@@ -57,9 +66,9 @@ jobs:
                 php_version=$(echo "$php_version" | xargs)
                 echo "🔍 Processing PHP version: $php_version"
 
-                ext_version=$(jq -r ".$extension_name.ver.\"$php_version\" // empty" "extension/BuildPhpExtension/config/matrix.json")
+                ext_version=$(jq -r ".$extension_name.ver.\"$php_version\" // empty" "extension/BuildPhpExtension/config/matrix.json" 2>/dev/null || echo "")
 
-                if [ -z "$ext_version" ]; then
+                if [ -z "$ext_version" ] || [ "$ext_version" = "null" ]; then
                     echo "⚠️ PHP $php_version - version not found"
                     invalid_versions+=("$php_version")
                 else
@@ -78,6 +87,8 @@ jobs:
                 echo "❌ No valid PHP versions found for extension $extension_name"
                 return 1
             fi
+
+            echo "🔧 Debug: Found ${#ext_groups[@]} version groups for $extension_name"
 
             # Trigger workflow for each extension version
             total_workflows=0
@@ -104,37 +115,51 @@ jobs:
                     param_value="$repo"
                 fi
 
+                echo "🔧 Debug: Using $param_name = $param_value"
+
+                # Create JSON payload
+                json_payload=$(cat <<EOF
+{
+  "ref": "master",
+  "inputs": {
+    "$param_name": "$param_value",
+    "extension-ref": "$ext_version",
+    "php-version-list": "$php_versions_for_ext",
+    "arch-list": "x64",
+    "ts-list": "$ts_list"
+  }
+}
+EOF
+)
+
+                echo "🔧 Debug: JSON payload: $json_payload"
+
                 # Trigger the PECL workflow with proper error handling
-                response=$(curl -s \
+                response=$(curl -s -w "\n%{http_code}" \
                   -X POST \
                   -H "Accept: application/vnd.github+json" \
                   -H "Authorization: Bearer $GITHUB_TOKEN" \
                   -H "X-GitHub-Api-Version: 2022-11-28" \
                   https://api.github.com/repos/OSPanel/php-windows-builder/actions/workflows/pecl.yml/dispatches \
-                  -d "{
-                    \"ref\": \"master\",
-                    \"inputs\": {
-                      \"$param_name\": \"$param_value\",
-                      \"extension-ref\": \"$ext_version\",
-                      \"php-version-list\": \"$php_versions_for_ext\",
-                      \"arch-list\": \"x64\",
-                      \"ts-list\": \"$ts_list\"
-                    }
-                  }")
+                  -d "$json_payload")
 
-                # Check if curl was successful
-                if [ $? -eq 0 ]; then
-                    # Check if response contains error
-                    if echo "$response" | jq -e '.message' > /dev/null 2>&1; then
-                        echo "❌ API Error: $(echo "$response" | jq -r '.message')"
-                        echo "❌ Failed to trigger workflow for $extension_name version $ext_version"
-                        return 1
-                    else
-                        echo "✅ Successfully triggered workflow for $extension_name version $ext_version"
-                        ((total_workflows++))
-                    fi
+                # Split response and status code
+                http_code=$(echo "$response" | tail -n1)
+                response_body=$(echo "$response" | head -n -1)
+
+                echo "🔧 Debug: HTTP Code: $http_code"
+                echo "🔧 Debug: Response: $response_body"
+
+                # Check HTTP status
+                if [ "$http_code" = "204" ]; then
+                    echo "✅ Successfully triggered workflow for $extension_name version $ext_version"
+                    ((total_workflows++))
                 else
-                    echo "❌ Curl failed for $extension_name version $ext_version"
+                    echo "❌ API Error (HTTP $http_code)"
+                    if [ -n "$response_body" ]; then
+                        echo "❌ Response: $response_body"
+                    fi
+                    echo "❌ Failed to trigger workflow for $extension_name version $ext_version"
                     return 1
                 fi
 
@@ -158,6 +183,9 @@ jobs:
         matrix_path="extension/BuildPhpExtension/config/matrix.json"
         max_count="${MAX_COUNT:-200}"
 
+        echo "🔧 Debug: Matrix path: $matrix_path"
+        echo "🔧 Debug: Max count: $max_count"
+
         # Validate max_count is a number
         if ! [[ "$max_count" =~ ^[0-9]+$ ]]; then
             echo "❌ max_count must be a positive integer, got: $max_count"
@@ -167,23 +195,36 @@ jobs:
         # Check if matrix file exists
         if [ ! -f "$matrix_path" ]; then
             echo "❌ Matrix file not found: $matrix_path"
+            ls -la extension/BuildPhpExtension/config/ || echo "❌ Config directory not found"
             exit 1
         fi
 
-        # Get list of all extensions
-        readarray -t all_extensions < <(jq -r 'keys[]' "$matrix_path")
+        echo "🔧 Debug: Matrix file exists, reading extensions..."
 
-        if [ ${#all_extensions[@]} -eq 0 ]; then
+        # Get list of all extensions
+        all_extensions=$(jq -r 'keys[]' "$matrix_path" 2>/dev/null || echo "")
+        if [ -z "$all_extensions" ]; then
+            echo "❌ Failed to read extensions from matrix file"
+            echo "🔧 Debug: Matrix file content preview:"
+            head -10 "$matrix_path"
+            exit 1
+        fi
+
+        readarray -t all_extensions_array <<< "$all_extensions"
+
+        if [ ${#all_extensions_array[@]} -eq 0 ]; then
             echo "❌ No extensions found in matrix file"
             exit 1
         fi
 
         # Limit to max_count if needed
-        to_process=("${all_extensions[@]:0:$max_count}")
+        to_process=("${all_extensions_array[@]:0:$max_count}")
 
-        echo "📊 Total extensions in matrix: ${#all_extensions[@]}"
+        echo "📊 Total extensions in matrix: ${#all_extensions_array[@]}"
         echo "📊 Extensions to process: ${#to_process[@]}"
         echo "📋 Extension list: ${to_process[*]}"
+
+        echo "🔧 Debug: Starting extension processing loop..."
 
         # Process extensions
         successfully_processed=()
@@ -202,6 +243,7 @@ jobs:
             else
                 failed_extensions+=("$extension")
                 echo "❌ Error processing extension $extension"
+                # Continue processing other extensions instead of failing completely
             fi
 
             # Rate limiting between different extensions (only if not the last extension)
@@ -219,10 +261,11 @@ jobs:
             echo "❌ Failed extensions: ${failed_extensions[*]}"
         fi
 
-        # Exit with error if all extensions failed
+        # Exit with error only if ALL extensions failed
         if [ ${#successfully_processed[@]} -eq 0 ] && [ ${#to_process[@]} -gt 0 ]; then
             echo "❌ All extensions failed to process"
             exit 1
         fi
 
         echo "🎉 All workflows have been triggered successfully!"
+        echo "🔧 Debug: Script completed successfully"
