@@ -183,6 +183,7 @@ jobs:
             to_entries
             | map({
                 ext: .key,
+                display_name: .key,
                 ver: (.value.ver[$php] // "")
               })
             | map(select(.ver != ""))[]
@@ -197,6 +198,7 @@ jobs:
           while IFS= read -r row; do
             if [[ -n "$row" ]]; then
               ext=$(echo "$row" | jq -r '.ext' | tr '[:upper:]' '[:lower:]')
+              display_name=$(echo "$row" | jq -r '.display_name')
               ver=$(echo "$row" | jq -r '.ver')
               original_ext="$ext"
 
@@ -223,10 +225,10 @@ jobs:
               tag="${ext}-${ver_clean}"
               file="php_${ext}-${ver_clean}-${PHP}-${TS}-${TOOL}-x64.zip"
               url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
-              PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
+              PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" --arg display_name "$display_name" '. + [{url:$url,file:$file,display_name:$display_name}]')
 
               processed=$((processed + 1))
-              echo "📦 [$processed/$extension_count] Planned: $ext v$ver_clean"
+              echo "📦 [$processed/$extension_count] Planned: $display_name v$ver_clean"
             fi
           done <<< "$DOWNLOADS"
 
@@ -269,7 +271,7 @@ jobs:
             $counter++
             $url = $item.url
             $file = Join-Path $target $item.file
-            $extName = ($item.file -split '_')[1] -split '-' | Select-Object -First 1
+            $extName = $item.display_name
 
             Write-Host "📦 [$counter/$totalExtensions] Downloading: $extName" -ForegroundColor Yellow
 
@@ -282,8 +284,13 @@ jobs:
                 $downloadedCount++
               }
             } catch {
-              Write-Host "❌ Failed: $extName - $($_.Exception.Message)" -ForegroundColor Red
-              $failedExtensions += $extName
+              $statusCode = ""
+              if ($_.Exception.Response) {
+                $statusCode = " (Status: $($_.Exception.Response.StatusCode.value__))"
+              }
+              Write-Host "❌ Failed: $extName$statusCode" -ForegroundColor Red
+              Write-Host "🔗 URL: $url" -ForegroundColor DarkGray
+              $failedExtensions += "$extName$statusCode"
               $failedCount++
             }
           }
@@ -295,7 +302,10 @@ jobs:
           Write-Host "❌ Failed: $failedCount extensions" -ForegroundColor $(if ($failedCount -gt 0) { 'Red' } else { 'Green' })
 
           if ($failedExtensions.Count -gt 0) {
-            Write-Host "💥 Failed extensions: $($failedExtensions -join ', ')" -ForegroundColor Red
+            Write-Host "💥 Failed extensions:" -ForegroundColor Red
+            foreach ($failed in $failedExtensions) {
+              Write-Host "   - $failed" -ForegroundColor Red
+            }
           }
 
           # Ensure at least some extensions were downloaded
