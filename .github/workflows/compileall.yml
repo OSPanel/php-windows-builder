@@ -1,4 +1,4 @@
-name: Compile Extensions
+name: Build PHP Extensions
 
 on:
   workflow_dispatch:
