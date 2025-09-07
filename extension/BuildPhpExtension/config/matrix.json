@@ -207,7 +207,7 @@
         },
         "source": "https://pecl.php.net/get/CSV"
     },
-    "datadog_trace":
+    "ddtrace":
     {
         "ver":
         {
@@ -895,7 +895,7 @@
         },
         "source": "https://pecl.php.net/get/pdo_ibm"
     },
-    "pdo_oci8":
+    "pdo_oci":
     {
         "ver":
         {
@@ -1455,7 +1455,7 @@
         },
         "source": "https://pecl.php.net/get/win32service"
     },
-    "WINCACHE":
+    "wincache":
     {
         "ver":
         {
