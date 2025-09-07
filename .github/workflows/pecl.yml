@@ -191,7 +191,7 @@ jobs:
             }
           }
           
-          if ($builtFile -and (Test-Path $builtFile)) {
+if ($builtFile -and (Test-Path $builtFile)) {
             Write-Host "Found built file: $builtFile"
             
             # Rename the artifact file to the new naming scheme if needed
@@ -199,6 +199,194 @@ jobs:
               Copy-Item $builtFile $releaseAssetName
             } else {
               $releaseAssetName = $builtFile
+            }
+            
+            # Create temporary folder for archive processing
+            $tempDir = Join-Path $env:TEMP "extension_processing_$(Get-Random)"
+            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            
+            try {
+              # Extract archive to temporary folder
+              Write-Host "Extracting archive to temp directory: $tempDir"
+              Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
+              Remove-Item $releaseAssetName -Force
+              
+              # Create subfolders
+              $extDir = Join-Path $tempDir "ext"
+              $extConfigDir = Join-Path $tempDir "ext-config"
+              $thirdPartyDir = Join-Path $tempDir "3rd-party"
+              New-Item -ItemType Directory -Path $extDir -Force | Out-Null
+              New-Item -ItemType Directory -Path $extConfigDir -Force | Out-Null
+              New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
+              
+              # Process files recursively (except bin folder)
+              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { $_.FullName -notmatch [regex]::Escape((Join-Path $tempDir "bin")) } | ForEach-Object {
+                $file = $_
+                $fileName = $file.Name
+                
+                if ($fileName -eq "php_${extension}.dll") {
+                  # Move main DLL to ext
+                  Move-Item $file.FullName -Destination $extDir
+                } elseif ($fileName -notmatch "\.dll$") {
+                  # Move other files (non-DLL) to 3rd-party
+                  $relativePath = $file.FullName.Substring($tempDir.Length + 1)
+                  $targetPath = Join-Path $thirdPartyDir $relativePath
+                  $targetDir = Split-Path $targetPath -Parent
+                  if (!(Test-Path $targetDir)) {
+                    New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+                  }
+                  Move-Item $file.FullName -Destination $targetPath
+                }
+              }
+              
+              # Process bin folder separately
+              $binDir = Join-Path $tempDir "bin"
+              if (Test-Path $binDir) {
+                # Move openssl.exe and tidy.exe to root
+                @("openssl.exe", "tidy.exe") | ForEach-Object {
+                  $binFile = Join-Path $binDir $_
+                  if (Test-Path $binFile) {
+                    Move-Item $binFile -Destination (Join-Path $tempDir $_)
+                  }
+                }
+                
+                # Move sasl2\plugin_sasldb.dll
+                $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
+                if (Test-Path $saslPlugin) {
+                  $saslDir = Join-Path $tempDir "sasl2"
+                  New-Item -ItemType Directory -Path $saslDir -Force | Out-Null
+                  Move-Item $saslPlugin -Destination (Join-Path $saslDir "plugin_sasldb.dll")
+                }
+              }
+              
+              # Remove unnecessary files and folders
+              Get-ChildItem -Path $tempDir -Recurse -Include "*.lib", "*.pdb" | Remove-Item -Force
+              @("bin", "3rd-party\imagick\config") | ForEach-Object {
+                $pathToRemove = Join-Path $tempDir $_
+                if (Test-Path $pathToRemove) {
+                  Remove-Item $pathToRemove -Recurse -Force
+                }
+              }
+              
+              # Remove imagick-specific files
+              if ($extension -eq "imagick") {
+                Get-ChildItem -Path $tempDir -Recurse -Include "IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_*.dll" | Remove-Item -Force
+              }
+              
+              # Download matrix files
+              $matrixIniUrl = "https://raw.githubusercontent.com/OSPanel/OpenServerPanel/refs/heads/main/resources/matrix/matrix-ini.json"
+              $matrixCommentsUrl = "https://raw.githubusercontent.com/OSPanel/OpenServerPanel/refs/heads/main/resources/matrix/matrix-ini-comments.json"
+              
+              $matrixIniPath = Join-Path $tempDir "matrix-ini.json"
+              $matrixCommentsPath = Join-Path $tempDir "matrix-ini-comments.json"
+              
+              Invoke-WebRequest -Uri $matrixIniUrl -OutFile $matrixIniPath
+              Invoke-WebRequest -Uri $matrixCommentsUrl -OutFile $matrixCommentsPath
+              
+              # Parse JSON files
+              $matrixIni = Get-Content $matrixIniPath -Raw | ConvertFrom-Json
+              $matrixComments = Get-Content $matrixCommentsPath -Raw | ConvertFrom-Json
+              
+              # Create comments dictionary
+              $commentMap = @{}
+              foreach ($comment in $matrixComments) {
+                $commentMap[$comment.parameter] = $comment.comment
+              }
+              
+              # Filter data for current extension
+              $extensionData = $matrixIni | Where-Object { $_.extension -eq $extension }
+              
+              if ($extensionData) {
+                # Determine PHP version for selecting correct values
+                $phpVersionKey = "${{ matrix.php-version }}"
+                
+                # Create INI file
+                $iniPath = Join-Path $extConfigDir "${extension}.ini"
+                $lines = New-Object System.Collections.Generic.List[string]
+                
+                # Group by extension
+                $rows = @()
+                foreach ($row in $extensionData) {
+                  $param = [string]$row.parameter
+                  $useFlag = [bool]$row.use
+                  
+                  # Find value for current PHP version
+                  $valueText = ""
+                  if ($row.php_versions -and $row.php_versions.PSObject.Properties[$phpVersionKey]) {
+                    $valueText = [string]$row.php_versions.PSObject.Properties[$phpVersionKey].Value
+                  }
+                  
+                  # Handle special values
+                  if ($valueText -eq "(none)") { continue }
+                  if ($valueText -eq "(empty)") { $valueText = "" }
+                  
+                  $commentText = if ($commentMap.ContainsKey($param)) { [string]$commentMap[$param] } else { "" }
+                  
+                  $rows += [pscustomobject]@{
+                    Parameter   = $param
+                    Value       = $valueText
+                    Comment     = $commentText
+                    IsCommented = (-not $useFlag)
+                  }
+                }
+                
+                if ($rows.Count -gt 0) {
+                  # Position for aligning equals sign
+                  $equalPosition = 38
+                  $baseCommentPosition = 62
+                  
+                  # Section header
+                  $sectionTitle = $extension
+                  $separator = ";---------------------------------------"
+                  
+                  $lines.Add($separator)
+                  $lines.Add("; $sectionTitle")
+                  $lines.Add($separator)
+                  $lines.Add("")
+                  
+                  foreach ($r in $rows) {
+                    $prefix = if ($r.IsCommented) { "; " } else { "" }
+                    $paramWithPrefix = "{0}{1}" -f $prefix, $r.Parameter
+                    $paddedParam = $paramWithPrefix.PadRight($equalPosition)
+                    $val = ($r.Value ?? "")
+                    
+                    $baseLine = "{0} = {1}" -f $paddedParam, $val
+                    
+                    if ([string]::IsNullOrEmpty($r.Comment)) {
+                      $lines.Add($baseLine.TrimEnd())
+                    } else {
+                      if ($baseLine.Length -le $baseCommentPosition) {
+                        $paddedBaseLine = $baseLine.PadRight($baseCommentPosition)
+                        $line = "{0}  ; {1}" -f $paddedBaseLine, $r.Comment
+                        $lines.Add($line.TrimEnd())
+                      } else {
+                        $line = "{0}  ; {1}" -f $baseLine, $r.Comment
+                        $lines.Add($line.TrimEnd())
+                      }
+                    }
+                  }
+                  
+                  $lines.Add("")
+                }
+                
+                # Write INI file
+                Set-Content -Path $iniPath -Encoding UTF8 -Value ($lines -join [Environment]::NewLine)
+                Write-Host "Generated INI config: $iniPath"
+              }
+              
+              # Remove temporary matrix files
+              Remove-Item $matrixIniPath -Force -ErrorAction SilentlyContinue
+              Remove-Item $matrixCommentsPath -Force -ErrorAction SilentlyContinue
+              
+              # Repackage archive
+              Write-Host "Repackaging archive: $releaseAssetName"
+              Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
+              
+            } finally {
+              # Remove temporary folder
+              if (Test-Path $tempDir) {
+                Remove-Item $tempDir -Recurse -Force
+              }
             }
             
             Write-Host "Uploading $releaseAssetName to release $releaseTag"
