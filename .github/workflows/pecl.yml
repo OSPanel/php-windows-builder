@@ -52,8 +52,6 @@ permissions:
   contents: write
 
 jobs:
-  # 1) Подготовка: сериализованно создаём git-тег (аннотированный) и релиз,
-  #    чтобы он был Verified, и чтобы не было гонок с матрицей.
   prepare-release:
     runs-on: ubuntu-latest
     concurrency:
@@ -132,7 +130,6 @@ jobs:
           echo "ref_clean=${{ steps.prep.outputs.ref_clean }}" >> "$GITHUB_OUTPUT"
           echo "tag=${{ steps.prep.outputs.tag }}" >> "$GITHUB_OUTPUT"
 
-  # 2) Генерация матрицы после того, как тег и релиз уже существуют.
   get-extension-matrix:
     needs: prepare-release
     runs-on: ubuntu-latest
@@ -151,7 +148,6 @@ jobs:
           arch-list: ${{ inputs.arch-list }}
           ts-list: ${{ inputs.ts-list }}
 
-  # 3) Сборка и немедленная загрузка ассетов в уже подготовленный релиз.
   extension:
     needs: [prepare-release, get-extension-matrix]
     runs-on: ${{ matrix.os }}
@@ -307,7 +303,6 @@ jobs:
             Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
           }
 
-  # 4) Уборка релиза/тега при сбое сборок.
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
