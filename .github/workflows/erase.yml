@@ -4,16 +4,15 @@ on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: 'Type YES to confirm deletion of all artifacts and workflow runs'
+        description: "Type YES to confirm deletion of all artifacts and workflow runs"
         required: true
-        default: 'NO'
+        default: "NO"
 
 permissions:
   actions: write
   contents: read
 
 env:
-  # Делаем токен доступным всем шагам по умолчанию
   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 jobs:
@@ -22,39 +21,41 @@ jobs:
     if: ${{ github.event.inputs.confirm == 'YES' }}
     steps:
       - name: Ensure prerequisites (gh, jq)
+        shell: bash
         run: |
           set -euo pipefail
           if ! command -v gh >/dev/null 2>&1; then
             echo "GitHub CLI (gh) not found. Installing..."
-            type -p curl >/dev/null || sudo apt-get update
+            sudo apt-get update -y
             sudo apt-get install -y curl
             curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
             sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-            sudo apt-get update
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
+            sudo apt-get update -y
             sudo apt-get install -y gh
           fi
           if ! command -v jq >/dev/null 2>&1; then
             echo "jq not found. Installing..."
-            sudo apt-get update
+            sudo apt-get update -y
             sudo apt-get install -y jq
           fi
 
       - name: Authenticate gh
+        shell: bash
         run: |
           set -euo pipefail
-          # Явно передаём токен в gh
-          echo "${GITHUB_TOKEN}" | gh auth login --with-token
+          printf "%s" "${GITHUB_TOKEN}" | gh auth login --with-token
           gh auth status
 
       - name: Delete all artifacts
+        shell: bash
         env:
           REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
           echo "Fetching artifacts for ${REPO}..."
           page=1
-          total_deleted=0
+          deleted_any=false
           while :; do
             resp="$(gh api -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts?per_page=100&page=${page}")" || break
             count="$(echo "$resp" | jq '.artifacts | length')"
@@ -65,13 +66,14 @@ jobs:
               [ -z "$id" ] && continue
               echo "Deleting artifact ID: $id"
               gh api --method DELETE -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts/${id}" || true
-              total_deleted=$((total_deleted+1))
+              deleted_any=true
             done
             page=$((page+1))
           done
           echo "Artifacts deletion completed."
 
       - name: Delete all workflow runs
+        shell: bash
         env:
           REPO: ${{ github.repository }}
         run: |
@@ -94,4 +96,5 @@ jobs:
           echo "Workflow runs deletion completed."
 
       - name: Done
+        shell: bash
         run: echo "Done: all artifacts and workflow runs have been deleted."
