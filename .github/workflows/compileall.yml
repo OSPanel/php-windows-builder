@@ -16,21 +16,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
-      with:
-        token: ${{ secrets.GITHUB_TOKEN }}
 
     - name: Setup jq
       run: sudo apt-get update && sudo apt-get install -y jq
-
-    - name: Setup GitHub CLI
-      run: |
-        curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
-        sudo apt update
-        sudo apt install gh
-
-    - name: Authenticate GitHub CLI
-      run: echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
 
     - name: Process Extensions
       env:
@@ -38,45 +26,45 @@ jobs:
         MAX_COUNT: ${{ github.event.inputs.max_extensions }}
       run: |
         #!/bin/bash
-        set -e  # Exit on any error
-        
-        # Function to process a single extension
-        process_extension() {
+        set -e
+
+        # Function to trigger workflow for a single extension
+        trigger_extension_workflow() {
             local extension_name="$1"
             local php_versions="$2"
-            
+
             echo "🔍 Processing extension: $extension_name"
-            
+
             # Check if matrix file exists
             if [ ! -f "extension/BuildPhpExtension/config/matrix.json" ]; then
                 echo "❌ Matrix file matrix.json not found"
                 return 1
             fi
-            
+
             # Get repository URL
             repo=$(jq -r ".$extension_name.source // empty" "extension/BuildPhpExtension/config/matrix.json")
             if [ -z "$repo" ]; then
                 echo "❌ Repository URL not found for $extension_name"
                 return 1
             fi
-            
+
             # Process PHP versions
             IFS=',' read -ra php_version_list <<< "$php_versions"
             declare -A ext_groups
             invalid_versions=()
-            
+
             for php_version in "${php_version_list[@]}"; do
-                php_version=$(echo "$php_version" | xargs) # trim whitespace
+                php_version=$(echo "$php_version" | xargs)
                 echo "🔍 Processing PHP version: $php_version"
-                
+
                 ext_version=$(jq -r ".$extension_name.ver.\"$php_version\" // empty" "extension/BuildPhpExtension/config/matrix.json")
-                
+
                 if [ -z "$ext_version" ]; then
                     echo "⚠️ PHP $php_version - version not found"
                     invalid_versions+=("$php_version")
                 else
                     echo "✅ PHP $php_version - extension version: $ext_version"
-                    
+
                     if [ -z "${ext_groups[$ext_version]:-}" ]; then
                         ext_groups[$ext_version]="$php_version"
                     else
@@ -84,18 +72,18 @@ jobs:
                     fi
                 fi
             done
-            
+
             # Check if we have any valid versions
             if [ ${#ext_groups[@]} -eq 0 ]; then
                 echo "❌ No valid PHP versions found for extension $extension_name"
                 return 1
             fi
-            
-            # Run workflow for each extension version
+
+            # Trigger workflow for each extension version
             total_workflows=0
             for ext_version in "${!ext_groups[@]}"; do
                 php_versions_for_ext="${ext_groups[$ext_version]}"
-                
+
                 # Determine ts list based on extension name
                 if [[ "$extension_name" == *"parallel"* ]]; then
                     ts_list="ts"
@@ -104,158 +92,112 @@ jobs:
                 else
                     ts_list="nts,ts"
                 fi
-                
-                echo "🚀 Starting workflow for extension '$extension_name' version $ext_version and PHP versions: $php_versions_for_ext"
-                
-                # Add error handling for gh command
-                if ! gh workflow run pecl.yml \
-                    -R OSPanel/php-windows-builder \
-                    -f extension-url="$repo" \
-                    -f extension-ref="$ext_version" \
-                    -f php-version-list="$php_versions_for_ext" \
-                    -f arch-list="x64" \
-                    -f ts-list="$ts_list"; then
-                    echo "❌ Failed to start workflow for extension $extension_name version $ext_version"
+
+                echo "🚀 Triggering workflow for extension '$extension_name' version $ext_version and PHP versions: $php_versions_for_ext"
+
+                # Use repository_dispatch to trigger the PECL workflow
+                curl -L \
+                  -X POST \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "Authorization: Bearer $GITHUB_TOKEN" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  https://api.github.com/repos/OSPanel/php-windows-builder/dispatches \
+                  -d "{
+                    \"event_type\": \"build_extension\",
+                    \"client_payload\": {
+                      \"extension_url\": \"$repo\",
+                      \"extension_ref\": \"$ext_version\",
+                      \"php_version_list\": \"$php_versions_for_ext\",
+                      \"arch_list\": \"x64\",
+                      \"ts_list\": \"$ts_list\"
+                    }
+                  }"
+
+                if [ $? -eq 0 ]; then
+                    echo "✅ Successfully triggered workflow for $extension_name version $ext_version"
+                    ((total_workflows++))
+                else
+                    echo "❌ Failed to trigger workflow for $extension_name version $ext_version"
                     return 1
                 fi
-                
-                ((total_workflows++))
+
                 echo ""
-                
-                # Add rate limiting to avoid GitHub API limits
-                sleep 1
+                # Rate limiting
+                sleep 2
             done
-            
+
             if [ ${#invalid_versions[@]} -gt 0 ]; then
                 invalid_versions_string=$(IFS=', '; echo "${invalid_versions[*]}")
                 echo "⚠️ Warning: The following PHP versions were not found in matrix.json for $extension_name: $invalid_versions_string"
             fi
-            
-            echo "✅ Successfully started $total_workflows workflows for extension $extension_name"
+
+            echo "✅ Successfully triggered $total_workflows workflows for extension $extension_name"
             return 0
         }
-        
+
         # Main logic
         matrix_path="extension/BuildPhpExtension/config/matrix.json"
-        send_path="send.json"
         max_count="${MAX_COUNT:-200}"
-        
+
         # Validate max_count is a number
         if ! [[ "$max_count" =~ ^[0-9]+$ ]]; then
             echo "❌ max_count must be a positive integer, got: $max_count"
             exit 1
         fi
-        
+
         # Check if matrix file exists
         if [ ! -f "$matrix_path" ]; then
             echo "❌ Matrix file not found: $matrix_path"
             exit 1
         fi
-        
-        # Read current list of processed extensions
-        processed=()
-        if [ -f "$send_path" ]; then
-            # Validate JSON file
-            if ! jq empty "$send_path" 2>/dev/null; then
-                echo "⚠️ Invalid JSON in $send_path, starting fresh"
-                echo "[]" > "$send_path"
-            else
-                readarray -t processed < <(jq -r '.[]' "$send_path" 2>/dev/null || echo "")
-            fi
-        else
-            echo "[]" > "$send_path"
-        fi
-        
-        # Get list of extensions
+
+        # Get list of all extensions
         readarray -t all_extensions < <(jq -r 'keys[]' "$matrix_path")
-        
+
         if [ ${#all_extensions[@]} -eq 0 ]; then
             echo "❌ No extensions found in matrix file"
             exit 1
         fi
-        
-        # Filter only those that haven't been processed yet
-        to_process=()
-        count=0
-        for extension in "${all_extensions[@]}"; do
-            # Check if extension is already processed
-            is_processed=false
-            for proc_ext in "${processed[@]}"; do
-                if [ "$proc_ext" = "$extension" ]; then
-                    is_processed=true
-                    break
-                fi
-            done
-            
-            if [ "$is_processed" = false ] && [ $count -lt $max_count ]; then
-                to_process+=("$extension")
-                ((count++))
-            fi
-        done
-        
+
+        # Limit to max_count if needed
+        to_process=("${all_extensions[@]:0:$max_count}")
+
         echo "📊 Total extensions in matrix: ${#all_extensions[@]}"
-        echo "📊 Already processed: ${#processed[@]}"
-        echo "📊 Found extensions to process: ${#to_process[@]}"
-        
-        if [ ${#to_process[@]} -eq 0 ]; then
-            echo "✅ All extensions have been processed already"
-            exit 0
-        fi
-        
+        echo "📊 Extensions to process: ${#to_process[@]}"
         echo "📋 Extension list: ${to_process[*]}"
-        
+
         # Process extensions
         successfully_processed=()
         failed_extensions=()
         versions="7.2,7.3,7.4,8.0,8.1,8.2,8.3,8.4"
-        
+
         for extension in "${to_process[@]}"; do
             echo "🔄 Processing extension: $extension"
-            
-            if process_extension "$extension" "$versions"; then
+
+            if trigger_extension_workflow "$extension" "$versions"; then
                 successfully_processed+=("$extension")
                 echo "✅ Extension $extension processed successfully"
             else
                 failed_extensions+=("$extension")
                 echo "❌ Error processing extension $extension"
             fi
-            
+
             # Rate limiting between extensions
-            sleep 2
+            sleep 3
         done
-        
-        # Write updated list of processed extensions (only successful ones)
-        all_processed=("${processed[@]}" "${successfully_processed[@]}")
-        printf '%s\n' "${all_processed[@]}" | jq -R . | jq -s . > "$send_path"
-        
+
         echo "✅ Processing completed."
         echo "📊 Successfully processed: ${#successfully_processed[@]}"
         echo "📊 Failed to process: ${#failed_extensions[@]}"
-        
+
         if [ ${#failed_extensions[@]} -gt 0 ]; then
             echo "❌ Failed extensions: ${failed_extensions[*]}"
         fi
-        
-        # Commit changes to send.json only if there were successful processes
-        if [ ${#successfully_processed[@]} -gt 0 ]; then
-            git config --local user.email "action@github.com"
-            git config --local user.name "GitHub Action"
-            git add send.json
-            
-            if git diff --staged --quiet; then
-                echo "ℹ️ No changes to commit"
-            else
-                git commit -m "Update processed extensions list - added ${#successfully_processed[@]} extensions" || {
-                    echo "⚠️ Failed to commit changes"
-                }
-                git push || {
-                    echo "⚠️ Failed to push changes"
-                }
-            fi
-        fi
-        
+
         # Exit with error if all extensions failed
         if [ ${#successfully_processed[@]} -eq 0 ] && [ ${#to_process[@]} -gt 0 ]; then
             echo "❌ All extensions failed to process"
             exit 1
         fi
+
+        echo "🎉 All workflows have been triggered successfully!"
