@@ -1,14 +1,17 @@
 name: Build PHP Extension From PECL
-run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
+run-name: Build PHP Extension ${{ inputs.extension-url || inputs.extension-name }}, ${{ inputs.extension-ref }}
 
 on:
   workflow_dispatch:
     inputs:
       extension-url:
-        description: 'Extension URL'
-        required: true
+        description: 'Extension URL (full URL) — либо используйте extension-name'
+        required: false
+      extension-name:
+        description: 'Extension source name from matrix (если не URL)'
+        required: false
       extension-ref:
-        description: 'Extension ref'
+        description: 'Extension ref (tag/branch/commit in extension repo)'
         required: true
       php-version-list:
         description: 'PHP versions to build'
@@ -55,7 +58,7 @@ jobs:
   prepare-release:
     runs-on: ubuntu-latest
     concurrency:
-      group: prepare-${{ inputs.extension-url }}-${{ inputs.extension-ref }}
+      group: prepare-${{ inputs.extension-url || inputs.extension-name }}-${{ inputs.extension-ref }}
       cancel-in-progress: false
     outputs:
       tag: ${{ steps.out.outputs.tag }}
@@ -73,10 +76,21 @@ jobs:
         run: |
           set -euo pipefail
 
-          extension_url="${{ inputs.extension-url }}"
-          extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
+          # Determine extension source input (URL or name)
+          extension_input_url="${{ inputs.extension-url }}"
+          extension_input_name="${{ inputs.extension-name }}"
+          if [ -n "${extension_input_url}" ]; then
+            extension_source="${extension_input_url}"
+            extension="$(basename "$extension_input_url" | tr '[:upper:]' '[:lower:]')"
+          elif [ -n "${extension_input_name}" ]; then
+            extension_source="${extension_input_name}"
+            extension="$(basename "$extension_input_name" | tr '[:upper:]' '[:lower:]')"
+          else
+            echo "Either 'extension-url' or 'extension-name' must be provided" >&2
+            exit 1
+          fi
 
-          # Normalize extension name
+          # Normalize extension display name
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -96,14 +110,15 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          # Target commit for the tag/release
+          # Ensure we operate on the current checked-out commit
           target_sha="$(git rev-parse HEAD)"
 
-          # If release already exists, do nothing
+          # If release exists — reuse it (tag already present and should be OK)
           if gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
             echo "Release ${tag} already exists"
           else
-            # If tag exists on origin, it may be a non-Verified tag. Delete to recreate as Verified.
+            # If a tag exists on origin, it could be a non-Verified tag from earlier runs.
+            # Drop it, then let GitHub recreate it as Verified during release creation.
             if git ls-remote --tags origin | grep -qE "refs/tags/${tag}$"; then
               echo "Tag ${tag} exists on origin. Deleting to recreate it as Verified..."
               gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/${tag}" || true
@@ -111,7 +126,7 @@ jobs:
               git push origin ":refs/tags/${tag}" || true
             fi
 
-            # Create release; GitHub will create a Verified tag at target_sha
+            # Create release — GitHub will create a Verified tag at target_sha
             gh release create "${tag}" \
               -t "${extension} ${ref_clean}" \
               -n "Release of PECL extension '${extension}' version ${ref_clean}" \
@@ -143,6 +158,7 @@ jobs:
         uses: ./extension-matrix
         with:
           extension-url: ${{ inputs.extension-url }}
+          extension-name: ${{ inputs.extension-name }}
           extension-ref: ${{ inputs.extension-ref }}
           php-version-list: ${{ inputs.php-version-list }}
           arch-list: ${{ inputs.arch-list }}
@@ -162,6 +178,7 @@ jobs:
         uses: ./extension
         with:
           extension-url: ${{ inputs.extension-url }}
+          extension-name: ${{ inputs.extension-name }}
           extension-ref: ${{ inputs.extension-ref }}
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
@@ -186,7 +203,15 @@ jobs:
           $ErrorActionPreference = "Stop"
 
           $extensionUrl = "${{ inputs.extension-url }}"
-          $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
+          $extensionName = "${{ inputs.extension-name }}"
+          if ([string]::IsNullOrWhiteSpace($extensionUrl) -and [string]::IsNullOrWhiteSpace($extensionName)) {
+            throw "Either extension-url or extension-name must be provided"
+          }
+          if (-not [string]::IsNullOrWhiteSpace($extensionUrl)) {
+            $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
+          } else {
+            $extensionOriginal = (Split-Path $extensionName -Leaf).ToLower()
+          }
           $extension = $extensionOriginal
 
           switch ($extensionOriginal) {
@@ -327,4 +352,5 @@ jobs:
             fi
             gh release delete "$release_tag" -R ${{ github.repository }} -y || true
           fi
+          # Always try to remove the tag as a ref
           gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
