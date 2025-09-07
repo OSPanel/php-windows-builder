@@ -216,7 +216,7 @@ jobs:
               
               # Create subdirectories
               $extDir = Join-Path $tempDir "ext"
-              $thirdPartyDir = Join-Path $tempDir "3rd-party"
+              $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
               
@@ -262,32 +262,34 @@ jobs:
                 }
               }
               
-              # Step 8: Move all files and folders (except *.dll files and ext folder) to 3rd-party
+              # Step 8: Move all files and folders (except *.dll files and ext folder) to 3rd-party\$extension
               Get-ChildItem -Path $tempDir | Where-Object { 
                 $_.Name -ne "ext" -and $_.Name -ne "3rd-party" -and
                 ($_.PSIsContainer -or $_.Extension -ne ".dll")
               } | ForEach-Object {
                 $destPath = Join-Path $thirdPartyDir $_.Name
                 Move-Item $_.FullName $destPath -Force
-                Write-Host "Moved $($_.Name) to 3rd-party"
+                Write-Host "Moved $($_.Name) to 3rd-party\$extension"
               }
               
               # Step 9: Remove *.lib and *.pdb files recursively, remove bin and 3rd-party\imagick\config folders
               Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
               Write-Host "Removed *.lib and *.pdb files"
               
-              # Remove bin folder from 3rd-party if it was moved there
+              # Remove bin folder from 3rd-party\$extension if it was moved there
               $binInThirdParty = Join-Path $thirdPartyDir "bin"
               if (Test-Path $binInThirdParty) {
                 Remove-Item $binInThirdParty -Recurse -Force
-                Write-Host "Removed bin folder from 3rd-party"
+                Write-Host "Removed bin folder from 3rd-party\$extension"
               }
               
               # Remove 3rd-party\imagick\config if it exists
-              $imagickConfigDir = Join-Path $thirdPartyDir "imagick\config"
-              if (Test-Path $imagickConfigDir) {
-                Remove-Item $imagickConfigDir -Recurse -Force
-                Write-Host "Removed 3rd-party\imagick\config folder"
+              if ($extension -eq "imagick") {
+                $imagickConfigDir = Join-Path $thirdPartyDir "config"
+                if (Test-Path $imagickConfigDir) {
+                  Remove-Item $imagickConfigDir -Recurse -Force
+                  Write-Host "Removed 3rd-party\imagick\config folder"
+                }
               }
               
               # Step 10: Create new archive
