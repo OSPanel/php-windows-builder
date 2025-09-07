@@ -27,6 +27,10 @@ jobs:
       run: |
         #!/bin/bash
 
+        # Environment and shell safety
+        export LC_ALL=C.UTF-8
+        export LANG=C.UTF-8
+
         # Enable debug mode and error handling
         set -e
         set -x
@@ -120,7 +124,7 @@ jobs:
 
                 echo "🔧 Debug: Using $param_name = $param_value"
 
-                # Create JSON payload - fixed heredoc
+                # Create JSON payload
                 json_payload="{
                   \"ref\": \"master\",
                   \"inputs\": {
@@ -226,7 +230,7 @@ jobs:
 
         echo "🔧 Debug: Starting extension processing loop..."
 
-        # Опционально: проверить содержимое массива с индексами и безопасным выводом
+        # Optional: verify array content safely
         echo "🔧 Debug: Verifying extensions list (index=value):"
         for i in "${!to_process[@]}"; do
           printf '[%d]=%q\n' "$i" "${to_process[$i]}"
@@ -241,9 +245,10 @@ jobs:
 
         for extension in "${to_process[@]}"; do
             ((current_extension++))
-            printf '🔄 Processing extension %d/%d: %s\n' "$current_extension" "$total_extensions" "$extension"
+            # Заменили printf на echo для надежности в разных локалях
+            echo "🔄 Processing extension $current_extension/$total_extensions: $extension"
 
-            # Важное изменение: не даём set -e оборвать джоб из-за сбоя внутри функции
+            # Локально отключаем set -e вокруг вызова функции
             set +e
             trigger_extension_workflow "$extension" "$versions"
             rc=$?
