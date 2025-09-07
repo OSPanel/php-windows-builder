@@ -724,11 +724,6 @@ jobs:
           - \`vs16\` - Visual Studio 2019 (PHP 8.0-8.3)
           - \`vs17\` - Visual Studio 2022 (PHP 8.4+)
 
-          🔥 **Additional Extensions:**
-          - **Blackfire**: Performance profiling (all PHP versions, TS/NTS)
-          - **Ioncube**: Code encryption loader (NTS only)
-          - **Firebird**: Database client library (PHP 7.3+)
-
           🤖 **Auto-generated** by GitHub Actions on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
           # Delete existing release if it exists
