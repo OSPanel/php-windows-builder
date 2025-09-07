@@ -1,98 +1,121 @@
-name: Erase All Runs and Artifacts
+name: Delete All
 
 on:
   workflow_dispatch:
     inputs:
       confirm:
-        description: "Type YES to delete ALL artifacts and workflow runs"
+        description: 'Type "DELETE" to confirm deletion of ALL runs and artifacts'
         required: true
-        default: "NO"
-
-permissions:
-  actions: write
-  contents: read
-
-env:
-  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        default: ''
 
 jobs:
-  erase:
+  delete-all:
     runs-on: ubuntu-latest
-    if: ${{ github.event.inputs.confirm == 'YES' }}
+    if: github.event.inputs.confirm == 'DELETE'
+
     steps:
-      - name: Install gh and jq
-        shell: bash
-        run: |
-          set -euo pipefail
-          if ! command -v gh >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y curl gnupg
-            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
-              | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
-            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
-            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" \
-              | sudo tee /etc/apt/sources.list.d/github-cli.list >/dev/null
-            sudo apt-get update -y
-            sudo apt-get install -y gh
-          fi
-          if ! command -v jq >/dev/null 2>&1; then
-            sudo apt-get update -y
-            sudo apt-get install -y jq
-          fi
+      - name: 🛡️ Checkout repository
+        uses: actions/checkout@v4
 
-      - name: Authenticate gh
-        shell: bash
+      - name: 🔧 Setup GitHub CLI and authenticate
         run: |
-          set -euo pipefail
-          printf "%s" "${GITHUB_TOKEN}" | gh auth login --with-token
+          # Check GitHub CLI availability
+          gh --version
+
+          # Authenticate with token
+          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
+
+          # Verify authentication
           gh auth status
-
-      - name: Delete all artifacts (paged)
-        shell: bash
         env:
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Deleting artifacts in ${REPO}..."
-          page=1
-          while true; do
-            resp="$(gh api -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts?per_page=100&page=${page}")" || break
-            count="$(echo "$resp" | jq '.artifacts | length')"
-            if [ "$count" -eq 0 ]; then
-              break
-            fi
-            echo "$resp" | jq -r '.artifacts[].id' | while read -r id; do
-              [ -z "$id" ] && continue
-              echo "Deleting artifact ID: $id"
-              gh api --method DELETE -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts/${id}" || true
-            done
-            page=$((page+1))
-          done
-          echo "Artifacts deletion finished."
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Delete all workflow runs (paged)
-        shell: bash
+      - name: 🗑️ Delete all artifacts
+        run: |
+          echo "⚠️ Deleting all artifacts for repository ${{ github.repository }}..."
+
+          # Get all artifacts and delete them
+          artifact_ids=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
+
+          if [ -z "$artifact_ids" ]; then
+            echo "📦 No artifacts found."
+          else
+            artifact_count=$(echo "$artifact_ids" | wc -l)
+            echo "📦 Found $artifact_count artifacts to delete"
+
+            counter=0
+            for artifact_id in $artifact_ids; do
+              counter=$((counter + 1))
+              echo "🗑️ [$counter/$artifact_count] Deleting artifact ID: $artifact_id"
+              if gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$artifact_id" >/dev/null 2>&1; then
+                echo "✅ Artifact $artifact_id deleted"
+              else
+                echo "❌ Failed to delete artifact $artifact_id"
+              fi
+            done
+          fi
         env:
-          REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          echo "Deleting workflow runs in ${REPO}..."
-          page=1
-          while true; do
-            resp="$(gh api -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/runs?per_page=100&page=${page}")" || break
-            count="$(echo "$resp" | jq '.workflow_runs | length')"
-            if [ "$count" -eq 0 ]; then
-              break
-            fi
-            echo "$resp" | jq -r '.workflow_runs[].id' | while read -r id; do
-              [ -z "$id" ] && continue
-              echo "Deleting workflow run ID: $id"
-              gh api --method DELETE -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/runs/${id}" || true
-            done
-            page=$((page+1))
-          done
-          echo "Workflow runs deletion finished."
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Done
-        shell: bash
-        run: echo "Done: all artifacts and workflow runs have been deleted."
+      - name: 🗑️ Delete all workflow runs
+        run: |
+          echo "⚠️ Deleting all workflow runs for repository ${{ github.repository }}..."
+
+          # Get all workflow runs and delete them (excluding current run)
+          current_run_id="${{ github.run_id }}"
+          run_ids=$(gh api repos/${{ github.repository }}/actions/runs --jq ".workflow_runs[] | select(.id != $current_run_id) | .id" 2>/dev/null || echo "")
+
+          if [ -z "$run_ids" ]; then
+            echo "🏃 No workflow runs found (except current one)."
+          else
+            run_count=$(echo "$run_ids" | wc -l)
+            echo "🏃 Found $run_count workflow runs to delete"
+
+            counter=0
+            for run_id in $run_ids; do
+              counter=$((counter + 1))
+              echo "🗑️ [$counter/$run_count] Deleting workflow run ID: $run_id"
+              if gh api --method DELETE "repos/${{ github.repository }}/actions/runs/$run_id" >/dev/null 2>&1; then
+                echo "✅ Workflow run $run_id deleted"
+              else
+                echo "❌ Failed to delete workflow run $run_id"
+              fi
+            done
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🧹 Final cleanup verification
+        run: |
+          echo "🔍 Verifying cleanup results..."
+
+          # Check remaining artifacts
+          remaining_artifacts=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.total_count' 2>/dev/null || echo "0")
+          echo "📦 Remaining artifacts: $remaining_artifacts"
+
+          # Check remaining runs (excluding current one)
+          current_run_id="${{ github.run_id }}"
+          remaining_runs=$(gh api repos/${{ github.repository }}/actions/runs --jq ".total_count - 1" 2>/dev/null || echo "0")
+          echo "🏃 Remaining workflow runs (except current): $remaining_runs"
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ✅ Cleanup completed
+        run: |
+          echo "🎉 Cleanup completed successfully!"
+          echo "📊 Repository: ${{ github.repository }}"
+          echo "⏰ Completion time: $(date)"
+          echo "ℹ️ Current run (${{ github.run_id }}) will be deleted automatically after completion"
+
+  cancel-action:
+    runs-on: ubuntu-latest
+    if: github.event.inputs.confirm != 'DELETE'
+
+    steps:
+      - name: ❌ Action cancelled
+        run: |
+          echo "❌ Action cancelled!"
+          echo "🔒 To confirm deletion, type 'DELETE' in the confirm field."
+          echo "⚠️ This action will delete ALL artifacts and workflow runs in the repository!"
+          echo "📊 Repository: ${{ github.repository }}"
+          exit 1
