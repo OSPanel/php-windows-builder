@@ -3,7 +3,7 @@
     {
         "libxml2": "*",
         "sqlite3": "*",
-        pthreads
+        "pthreads": "*"
     },
     "php-ext":
     {
