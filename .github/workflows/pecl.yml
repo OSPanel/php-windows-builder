@@ -204,31 +204,31 @@ jobs:
             # Repack the archive
             $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-            
+
             try {
               Write-Host "Extracting and repacking archive: $releaseAssetName"
-              
+
               # Extract archive to temporary directory
               Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
-              
+
               # Remove original archive
               Remove-Item $releaseAssetName -Force
-              
+
               # Create subdirectories
               $extDir = Join-Path $tempDir "ext"
               $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
-              
+
               # Step 4: Move main extension DLL to ext folder (process all files recursively except bin)
-              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { 
-                $_.FullName -notlike "*\bin\*" -and $_.Name -eq "php_${extension}.dll" 
+              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object {
+                $_.FullName -notlike "*\bin\*" -and $_.Name -eq "php_${extension}.dll"
               } | ForEach-Object {
                 $destPath = Join-Path $extDir $_.Name
                 Move-Item $_.FullName $destPath -Force
                 Write-Host "Moved $($_.Name) to ext folder"
               }
-              
+
               # Step 5: Process bin folder
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
@@ -251,7 +251,7 @@ jobs:
               # Step 6: Remove *.lib and *.pdb files recursively
               Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
               Write-Host "Removed *.lib and *.pdb files"
-              
+
               # Step 7: Move all files and folders to 3rd-party\$extension
               Get-ChildItem -Path $tempDir | Where-Object {
                 $_.Name -ne 'ext' -and
@@ -267,10 +267,10 @@ jobs:
                   Move-Item -Path $_.FullName -Destination $destPath -Force
                   Write-Host "Moved $($_.Name) to 3rd-party\$extension"
               }
-              
+
               # Step 8: Create new archive
               Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
-              
+
             } finally {
               # Clean up temporary directory
               if (Test-Path $tempDir) {
