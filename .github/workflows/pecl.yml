@@ -225,11 +225,21 @@ jobs:
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
               Write-Host "Subfolders created: ext, ext-config, 3rd-party"
               
-              # Process files recursively (except bin folder)
-              Write-Host "Processing files recursively (excluding bin folder)..."
+              # First, collect all files to process (excluding bin folder and newly created folders)
+              Write-Host "Collecting files to process..."
+              $binPath = Join-Path $tempDir "bin"
+              $filesToProcess = Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { 
+                $_.FullName -notmatch [regex]::Escape($binPath) -and
+                $_.FullName -notmatch [regex]::Escape($extDir) -and
+                $_.FullName -notmatch [regex]::Escape($extConfigDir) -and
+                $_.FullName -notmatch [regex]::Escape($thirdPartyDir)
+              }
+              Write-Host "Found $($filesToProcess.Count) files to process"
+              
+              # Process collected files
+              Write-Host "Processing files..."
               $filesProcessed = 0
-              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { $_.FullName -notmatch [regex]::Escape((Join-Path $tempDir "bin")) } | ForEach-Object {
-                $file = $_
+              foreach ($file in $filesToProcess) {
                 $fileName = $file.Name
                 $filesProcessed++
                 
@@ -246,9 +256,10 @@ jobs:
                     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
                   }
                   Move-Item $file.FullName -Destination $targetPath
-                  if ($filesProcessed % 10 -eq 0) {
-                    Write-Host "Processed $filesProcessed files..."
-                  }
+                }
+                
+                if ($filesProcessed % 100 -eq 0) {
+                  Write-Host "Processed $filesProcessed files..."
                 }
               }
               Write-Host "Finished processing $filesProcessed files"
