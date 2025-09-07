@@ -1,4 +1,4 @@
-name: 🔧 Build PHP Extensions Packs
+name: 🚀 Build PHP Extensions Packs
 run-name: 🚀 Build PHP Ext Packs ${{ inputs.php-versions || 'all-in-matrix' }}
 
 on:
