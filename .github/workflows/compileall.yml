@@ -119,18 +119,18 @@ jobs:
 
                 # Create JSON payload
                 json_payload=$(cat <<EOF
-{
-  "ref": "master",
-  "inputs": {
-    "$param_name": "$param_value",
-    "extension-ref": "$ext_version",
-    "php-version-list": "$php_versions_for_ext",
-    "arch-list": "x64",
-    "ts-list": "$ts_list"
-  }
-}
-EOF
-)
+                {
+                  "ref": "master",
+                  "inputs": {
+                    "$param_name": "$param_value",
+                    "extension-ref": "$ext_version",
+                    "php-version-list": "$php_versions_for_ext",
+                    "arch-list": "x64",
+                    "ts-list": "$ts_list"
+                  }
+                }
+                EOF
+                )
 
                 echo "🔧 Debug: JSON payload: $json_payload"
 
