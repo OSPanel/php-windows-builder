@@ -223,13 +223,12 @@ jobs:
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
 
-              # Step 4: Move main extension DLL to ext folder (process all files recursively except bin)
-              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object {
-                $_.FullName -notlike "*\bin\*" -and $_.Name -eq "php_${extension}.dll"
-              } | ForEach-Object {
-                $destPath = Join-Path $extDir $_.Name
-                Move-Item $_.FullName $destPath -Force
-                Write-Host "Moved $($_.Name) to ext folder"
+              # Step 4: Move main extension DLL to ext folder
+              $rootDll = Join-Path $tempDir "php_${extension}.dll"
+              if (Test-Path $rootDll) {
+                $destPath = Join-Path $extDir "php_${extension}.dll"
+                Move-Item $rootDll $destPath -Force
+                Write-Host "Moved php_${extension}.dll to ext folder"
               }
 
               # Step 5: Process bin folder
