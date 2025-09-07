@@ -31,10 +31,8 @@ jobs:
         id: release-info
         shell: bash
         run: |
-          # Generate timestamp-based release tag
-          TIMESTAMP=$(date -u '+%Y.%m.%d.%H.%M')
-          TAG="ext-pack-${TIMESTAMP}"
-          TITLE="Extensions Pack for PHP v${TIMESTAMP}"
+          TAG="ext-pack"
+          TITLE="Extensions Pack for PHP"
 
           echo "🏷️ Release tag: $TAG"
           echo "📝 Release title: $TITLE"
