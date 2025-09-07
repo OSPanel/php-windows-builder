@@ -43,6 +43,9 @@ on:
       test-runner-args:
         description: 'Arguments for the test runner'
         required: false
+
+  repository_dispatch:
+    types: [build_extension]
 jobs:
   get-extension-matrix:
     runs-on: ubuntu-latest
