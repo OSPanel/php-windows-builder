@@ -328,3 +328,4 @@ jobs:
             gh release delete "$release_tag" -R ${{ github.repository }} -y || true
           fi
           gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
+          
