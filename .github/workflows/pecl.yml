@@ -283,31 +283,33 @@ jobs:
             
             Write-Host "Uploading $releaseAssetName to release $releaseTag"
             gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
+
+            # Cleanup artifacts for this run immediately after successful upload
+            Write-Host "=== Deleting artifacts after successful release upload ==="
+            try {
+              $runId = "${{ github.run_id }}"
+              $repo = "${{ github.repository }}"
+              $artifactIds = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[].id' 2>$null
+              if ($artifactIds) {
+                $artifactIds -split "`n" | ForEach-Object {
+                  if ($_ -match '^\d+$') {
+                    Write-Host "Deleting artifact ID $_"
+                    gh api -X DELETE "repos/$repo/actions/artifacts/$_" | Out-Null
+                  }
+                }
+              } else {
+                Write-Host "No artifacts found for this run"
+              }
+            } catch {
+              Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
+            }
           } else {
             Write-Host "No built ZIP file found! Searched for: $artifactName, $artifactNameModern"
             Write-Host "Current directory contents:"
             Get-ChildItem -Recurse -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
             exit 1
           }
-          
-  cleanup-artifacts:
-    runs-on: ubuntu-latest
-    if: success()
-    needs: [extension]
-    steps:
-      - name: Cleanup artifacts after successful release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          echo "=== Deleting artifacts after successful release ==="
-          artifact_ids=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
-          if [ -n "$artifact_ids" ]; then
-            for artifact_id in $artifact_ids; do
-              echo "Deleting artifact $artifact_id"
-              gh api -X DELETE repos/${{ github.repository }}/actions/artifacts/$artifact_id || true
-            done
-          fi
-        
+
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
