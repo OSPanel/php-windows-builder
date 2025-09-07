@@ -191,7 +191,7 @@ jobs:
             }
           }
           
-if ($builtFile -and (Test-Path $builtFile)) {
+          if ($builtFile -and (Test-Path $builtFile)) {
             Write-Host "Found built file: $builtFile"
             
             # Rename the artifact file to the new naming scheme if needed
