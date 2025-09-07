@@ -27,19 +27,22 @@ jobs:
       run: |
         #!/bin/bash
 
-        # Environment and shell safety
+        # Локаль для корректного вывода UTF-8
         export LC_ALL=C.UTF-8
         export LANG=C.UTF-8
 
-        # Enable debug mode and error handling
+        # Режимы отладки и остановки по ошибке
         set -e
         set -x
+
+        # Трап, чтобы увидеть место падения, если случится
+        trap 'rc=$?; echo "❌ Trap: error code $rc at line $LINENO"; exit $rc' ERR
 
         echo "🔧 Debug: Starting script execution"
         echo "🔧 Debug: MAX_COUNT=$MAX_COUNT"
         echo "🔧 Debug: GITHUB_TOKEN length: ${#GITHUB_TOKEN}"
 
-        # Function to trigger workflow for a single extension
+        # Функция запуска сборки одного расширения
         trigger_extension_workflow() {
             local extension_name="$1"
             local php_versions="$2"
@@ -47,13 +50,13 @@ jobs:
             echo "🔍 Processing extension: $extension_name"
             echo "🔧 Debug: Received PHP versions: $php_versions"
 
-            # Check if matrix file exists
+            # Проверка наличия matrix.json
             if [ ! -f "extension/BuildPhpExtension/config/matrix.json" ]; then
                 echo "❌ Matrix file matrix.json not found"
                 return 1
             fi
 
-            # Get repository URL/name
+            # Получаем источник репозитория
             repo=$(jq -r ".$extension_name.source // empty" "extension/BuildPhpExtension/config/matrix.json" 2>/dev/null || echo "")
             if [ -z "$repo" ] || [ "$repo" = "null" ]; then
                 echo "❌ Repository source not found for $extension_name"
@@ -62,7 +65,7 @@ jobs:
 
             echo "🔧 Debug: Extension $extension_name has source: $repo"
 
-            # Process PHP versions
+            # Обработка списка версий PHP
             IFS=',' read -ra php_version_list <<< "$php_versions"
             declare -A ext_groups
             invalid_versions=()
@@ -89,7 +92,7 @@ jobs:
                 fi
             done
 
-            # Check if we have any valid versions
+            # Проверка: есть ли что собирать
             if [ ${#ext_groups[@]} -eq 0 ]; then
                 echo "❌ No valid PHP versions found for extension $extension_name"
                 return 1
@@ -97,12 +100,12 @@ jobs:
 
             echo "🔧 Debug: Found ${#ext_groups[@]} version groups for $extension_name"
 
-            # Trigger workflow for each extension version
+            # Триггерим workflow для каждой версии расширения
             total_workflows=0
             for ext_version in "${!ext_groups[@]}"; do
                 php_versions_for_ext="${ext_groups[$ext_version]}"
 
-                # Determine ts list based on extension name
+                # ts/nts в зависимости от расширения
                 if [[ "$extension_name" == *"parallel"* ]]; then
                     ts_list="ts"
                 elif [[ "$extension_name" == *"wincache"* ]]; then
@@ -113,7 +116,7 @@ jobs:
 
                 echo "🚀 Triggering workflow for extension '$extension_name' version $ext_version and PHP versions: $php_versions_for_ext"
 
-                # Determine parameter name based on source type
+                # Какой параметр передавать — URL или имя
                 if [[ "$repo" =~ ^https?:// ]]; then
                     param_name="extension-url"
                     param_value="$repo"
@@ -124,7 +127,7 @@ jobs:
 
                 echo "🔧 Debug: Using $param_name = $param_value"
 
-                # Create JSON payload
+                # Формируем JSON-пейлоад
                 json_payload="{
                   \"ref\": \"master\",
                   \"inputs\": {
@@ -138,7 +141,7 @@ jobs:
 
                 echo "🔧 Debug: JSON payload: $json_payload"
 
-                # Trigger the PECL workflow with proper error handling
+                # Запрос к GitHub API
                 response=$(curl -s -w "\n%{http_code}" \
                   -X POST \
                   -H "Accept: application/vnd.github+json" \
@@ -147,14 +150,13 @@ jobs:
                   https://api.github.com/repos/OSPanel/php-windows-builder/actions/workflows/pecl.yml/dispatches \
                   -d "$json_payload")
 
-                # Split response and status code
+                # Разделяем тело и код
                 http_code=$(echo "$response" | tail -n1)
                 response_body=$(echo "$response" | head -n -1)
 
                 echo "🔧 Debug: HTTP Code: $http_code"
                 echo "🔧 Debug: Response: $response_body"
 
-                # Check HTTP status
                 if [ "$http_code" = "204" ]; then
                     echo "✅ Successfully triggered workflow for $extension_name version $ext_version"
                     ((total_workflows++))
@@ -167,7 +169,7 @@ jobs:
                     return 1
                 fi
 
-                # Rate limiting between workflow triggers for same extension
+                # Пауза между несколькими версиями одного расширения
                 if [ $total_workflows -lt ${#ext_groups[@]} ]; then
                     echo "⏱️ Rate limiting: waiting 3 seconds before next workflow trigger..."
                     sleep 3
@@ -183,20 +185,20 @@ jobs:
             return 0
         }
 
-        # Main logic
+        # Основная логика
         matrix_path="extension/BuildPhpExtension/config/matrix.json"
         max_count="${MAX_COUNT:-200}"
 
         echo "🔧 Debug: Matrix path: $matrix_path"
         echo "🔧 Debug: Max count: $max_count"
 
-        # Validate max_count is a number
+        # Проверяем, что max_count — число
         if ! [[ "$max_count" =~ ^[0-9]+$ ]]; then
             echo "❌ max_count must be a positive integer, got: $max_count"
             exit 1
         fi
 
-        # Check if matrix file exists
+        # Проверка наличия файла
         if [ ! -f "$matrix_path" ]; then
             echo "❌ Matrix file not found: $matrix_path"
             ls -la extension/BuildPhpExtension/config/ || echo "❌ Config directory not found"
@@ -205,7 +207,7 @@ jobs:
 
         echo "🔧 Debug: Matrix file exists, reading extensions..."
 
-        # Get list of all extensions
+        # Считываем список ключей (названий расширений)
         all_extensions=$(jq -r 'keys[]' "$matrix_path" 2>/dev/null || echo "")
         if [ -z "$all_extensions" ]; then
             echo "❌ Failed to read extensions from matrix file"
@@ -221,7 +223,7 @@ jobs:
             exit 1
         fi
 
-        # Limit to max_count if needed
+        # Ограничиваем количеством
         to_process=("${all_extensions_array[@]:0:$max_count}")
 
         echo "📊 Total extensions in matrix: ${#all_extensions_array[@]}"
@@ -230,13 +232,12 @@ jobs:
 
         echo "🔧 Debug: Starting extension processing loop..."
 
-        # Optional: verify array content safely
-        echo "🔧 Debug: Verifying extensions list (index=value):"
-        for i in "${!to_process[@]}"; do
-          printf '[%d]=%q\n' "$i" "${to_process[$i]}"
-        done
+        # Убираем потенциально проблемный printf-диагноз; при необходимости можно включить позже
+        # for i in "${!to_process[@]}"; do
+        #   printf '[%d]=%q\n' "$i" "${to_process[$i]}"
+        # done
 
-        # Process extensions
+        # Обрабатываем расширения
         successfully_processed=()
         failed_extensions=()
         versions="7.2,7.3,7.4,8.0,8.1,8.2,8.3,8.4"
@@ -245,7 +246,7 @@ jobs:
 
         for extension in "${to_process[@]}"; do
             ((current_extension++))
-            # Заменили printf на echo для надежности в разных локалях
+            # Используем echo для надёжности
             echo "🔄 Processing extension $current_extension/$total_extensions: $extension"
 
             # Локально отключаем set -e вокруг вызова функции
@@ -260,10 +261,10 @@ jobs:
             else
                 failed_extensions+=("$extension")
                 echo "❌ Error processing extension $extension (rc=$rc)"
-                # Continue processing other extensions instead of failing completely
+                # Продолжаем дальше
             fi
 
-            # Rate limiting between different extensions (only if not the last extension)
+            # Пауза между разными расширениями
             if [ $current_extension -lt $total_extensions ]; then
                 echo "⏱️ Rate limiting: waiting 5 seconds before next extension..."
                 sleep 5
@@ -278,7 +279,7 @@ jobs:
             echo "❌ Failed extensions: ${failed_extensions[*]}"
         fi
 
-        # Exit with error only if ALL extensions failed
+        # Падает только если ВСЁ упало
         if [ ${#successfully_processed[@]} -eq 0 ] && [ ${#to_process[@]} -gt 0 ]; then
             echo "❌ All extensions failed to process"
             exit 1
