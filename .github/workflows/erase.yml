@@ -1,0 +1,97 @@
+name: Delete All Runs and Artifacts
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type YES to confirm deletion of all artifacts and workflow runs'
+        required: true
+        default: 'NO'
+
+permissions:
+  actions: write
+  contents: read
+
+env:
+  # Делаем токен доступным всем шагам по умолчанию
+  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+jobs:
+  delete-all:
+    runs-on: ubuntu-latest
+    if: ${{ github.event.inputs.confirm == 'YES' }}
+    steps:
+      - name: Ensure prerequisites (gh, jq)
+        run: |
+          set -euo pipefail
+          if ! command -v gh >/dev/null 2>&1; then
+            echo "GitHub CLI (gh) not found. Installing..."
+            type -p curl >/dev/null || sudo apt-get update
+            sudo apt-get install -y curl
+            curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo dd of=/usr/share/keyrings/githubcli-archive-keyring.gpg
+            sudo chmod go+r /usr/share/keyrings/githubcli-archive-keyring.gpg
+            echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+            sudo apt-get update
+            sudo apt-get install -y gh
+          fi
+          if ! command -v jq >/dev/null 2>&1; then
+            echo "jq not found. Installing..."
+            sudo apt-get update
+            sudo apt-get install -y jq
+          fi
+
+      - name: Authenticate gh
+        run: |
+          set -euo pipefail
+          # Явно передаём токен в gh
+          echo "${GITHUB_TOKEN}" | gh auth login --with-token
+          gh auth status
+
+      - name: Delete all artifacts
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Fetching artifacts for ${REPO}..."
+          page=1
+          total_deleted=0
+          while :; do
+            resp="$(gh api -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts?per_page=100&page=${page}")" || break
+            count="$(echo "$resp" | jq '.artifacts | length')"
+            if [ "$count" -eq 0 ]; then
+              break
+            fi
+            echo "$resp" | jq -r '.artifacts[].id' | while read -r id; do
+              [ -z "$id" ] && continue
+              echo "Deleting artifact ID: $id"
+              gh api --method DELETE -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/artifacts/${id}" || true
+              total_deleted=$((total_deleted+1))
+            done
+            page=$((page+1))
+          done
+          echo "Artifacts deletion completed."
+
+      - name: Delete all workflow runs
+        env:
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          echo "Fetching workflow runs for ${REPO}..."
+          page=1
+          while :; do
+            resp="$(gh api -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/runs?per_page=100&page=${page}")" || break
+            count="$(echo "$resp" | jq '.workflow_runs | length')"
+            if [ "$count" -eq 0 ]; then
+              break
+            fi
+            echo "$resp" | jq -r '.workflow_runs[].id' | while read -r id; do
+              [ -z "$id" ] && continue
+              echo "Deleting workflow run ID: $id"
+              gh api --method DELETE -H 'Accept: application/vnd.github+json' "/repos/${REPO}/actions/runs/${id}" || true
+            done
+            page=$((page+1))
+          done
+          echo "Workflow runs deletion completed."
+
+      - name: Done
+        run: echo "Done: all artifacts and workflow runs have been deleted."
