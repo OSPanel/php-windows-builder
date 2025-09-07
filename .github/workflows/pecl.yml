@@ -83,6 +83,7 @@ jobs:
           set -euo pipefail
           extension_url="${{ inputs.extension-url }}"
           extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
+          # Replace some repository names with extension names used in releases
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -96,9 +97,11 @@ jobs:
           esac
 
           ref="${{ inputs.extension-ref }}"
+          # Strip 'v' prefix from version for the release tag
           ref_clean="$(echo "$ref" | sed 's/^v//')"
           release_tag="${extension}-${ref_clean}"
 
+          # Create release if it does not exist
           if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
             gh release create "${release_tag}" \
               -t "${extension} ${ref_clean}" \
@@ -131,10 +134,13 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          $ErrorActionPreference = "Stop"
+
           $extensionUrl = "${{ inputs.extension-url }}"
           $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
           $extension = $extensionOriginal
 
+          # Normalize extension name for release asset naming
           switch ($extensionOriginal) {
             "base58-php-ext" { $extension = "base58" }
             "dd-trace-php" { $extension = "ddtrace" }
@@ -153,6 +159,7 @@ jobs:
           $ref = "${{ inputs.extension-ref }}"
           $refClean = $ref -replace '^v', ''
 
+          # Derive Visual Studio toolset identifier from PHP version
           $vsVersion = switch ($phpVersion) {
             { $_ -in @("7.2", "7.3", "7.4") } { "vc15" }
             { $_ -in @("8.0", "8.1", "8.2", "8.3") } { "vs16" }
@@ -160,133 +167,130 @@ jobs:
             default { "vs16" }
           }
 
+          # Possible artifact file names produced by the build
           $artifactName = "php_${extensionOriginal}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
           $artifactNameModern = "php_${extension}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
 
+          # Final asset name in the release
           $releaseTag = "${extension}-${refClean}"
           $releaseAssetName = "php_${extension}-${refClean}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
 
+          # Search for the built file in common locations
           $searchPaths = @(".", "C:\b", ".\artifacts", ".\build")
           $builtFile = $null
           $finalName = $artifactName
 
           foreach ($searchPath in $searchPaths) {
             if (Test-Path $searchPath) {
+              # Try legacy artifact name
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactName -File -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($foundFile) {
-                $builtFile = $foundFile.FullName
-                $finalName = $artifactName
-                break
-              }
-
+              if ($foundFile) { $builtFile = $foundFile.FullName; $finalName = $artifactName; break }
+              # Try modern artifact name
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactNameModern -File -ErrorAction SilentlyContinue | Select-Object -First 1
-              if ($foundFile) {
-                $builtFile = $foundFile.FullName
-                $finalName = $artifactNameModern
-                break
-              }
+              if ($foundFile) { $builtFile = $foundFile.FullName; $finalName = $artifactNameModern; break }
             }
           }
 
-          if ($builtFile -and (Test-Path $builtFile)) {
-            Write-Host "Found built file: $builtFile"
-
-            if ($finalName -ne $releaseAssetName) {
-              Copy-Item $builtFile $releaseAssetName
-            } else {
-              $releaseAssetName = $builtFile
-            }
-
-            $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
-            New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-
-            try {
-              Write-Host "Extracting and repacking archive: $releaseAssetName"
-
-              Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
-              Remove-Item $releaseAssetName -Force
-
-              $extDir = Join-Path $tempDir "ext"
-              $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
-              New-Item -ItemType Directory -Path $extDir -Force | Out-Null
-              New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
-
-              $rootDll = Join-Path $tempDir "php_${extension}.dll"
-              if (Test-Path $rootDll) {
-                $destPath = Join-Path $extDir "php_${extension}.dll"
-                Move-Item $rootDll $destPath -Force
-                Write-Host "Moved php_${extension}.dll to ext folder"
-              }
-
-              $binDir = Join-Path $tempDir "bin"
-              if (Test-Path $binDir) {
-                $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
-                if (Test-Path $saslPlugin) {
-                  $sasl2Dir = Join-Path $tempDir "sasl2"
-                  New-Item -ItemType Directory -Path $sasl2Dir -Force | Out-Null
-                  $destPath = Join-Path $sasl2Dir "plugin_sasldb.dll"
-                  if (-not (Test-Path $destPath)) {
-                    New-Item -ItemType Directory -Path $sasl2Dir -Force | Out-Null
-                    Move-Item $saslPlugin $destPath -Force
-                    Write-Host "Moved sasl2\plugin_sasldb.dll to root"
-                  }
-                }
-                Remove-Item $binDir -Recurse -Force
-                Write-Host "Removed bin folder"
-              }
-
-              Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
-              Write-Host "Removed *.lib and *.pdb files"
-
-              Get-ChildItem -Path $tempDir | Where-Object {
-                $_.Name -ne 'ext' -and
-                $_.Name -ne '3rd-party' -and
-                $_.Name -ne 'sasl2' -and
-                (
-                  $_.PSIsContainer -or
-                  ($_.Extension -notin @('.dll'))
-                ) -and
-                -not ( $extension -eq 'imagick' -and $_.PSIsContainer -and $_.Name -eq 'config' )
-              } | ForEach-Object {
-                  $destPath = Join-Path $thirdPartyDir $_.Name
-                  Move-Item -Path $_.FullName -Destination $destPath -Force
-                  Write-Host "Moved $($_.Name) to 3rd-party\$extension"
-              }
-
-              Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
-
-            } finally {
-              if (Test-Path $tempDir) {
-                Remove-Item $tempDir -Recurse -Force
-              }
-            }
-
-            Write-Host "Uploading $releaseAssetName to release $releaseTag"
-            gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
-
-            Write-Host "=== Deleting artifacts after successful release upload ==="
-            try {
-              $runId = "${{ github.run_id }}"
-              $repo = "${{ github.repository }}"
-              $artifactIds = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[].id' 2>$null
-              if ($artifactIds) {
-                $artifactIds -split "`n" | ForEach-Object {
-                  if ($_ -match '^\d+$') {
-                    Write-Host "Deleting artifact ID $_"
-                    gh api -X DELETE "repos/$repo/actions/artifacts/$_" | Out-Null
-                  }
-                }
-              } else {
-                Write-Host "No artifacts found for this run"
-              }
-            } catch {
-              Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
-            }
-          } else {
+          if (-not $builtFile -or -not (Test-Path $builtFile)) {
             Write-Host "No built ZIP file found! Searched for: $artifactName, $artifactNameModern"
             Write-Host "Current directory contents:"
             Get-ChildItem -Recurse -Filter "*.zip" -ErrorAction SilentlyContinue | ForEach-Object { Write-Host $_.FullName }
             exit 1
+          }
+
+          Write-Host "Found built file: $builtFile"
+
+          # Ensure the file name matches the intended release asset name
+          if ($finalName -ne $releaseAssetName) {
+            Copy-Item $builtFile $releaseAssetName -Force
+            $artifactPathToUpload = (Resolve-Path $releaseAssetName).Path
+          } else {
+            $artifactPathToUpload = $builtFile
+          }
+
+          # Repack the archive into a normalized structure
+          $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
+          New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+
+          try {
+            Write-Host "Extracting and repacking archive: $artifactPathToUpload"
+            Expand-Archive -Path $artifactPathToUpload -DestinationPath $tempDir -Force
+            Remove-Item $artifactPathToUpload -Force
+
+            # Create target directories
+            $extDir = Join-Path $tempDir "ext"
+            $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
+            New-Item -ItemType Directory -Path $extDir -Force | Out-Null
+            New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
+
+            # Move main extension DLL into ext/
+            $rootDll = Join-Path $tempDir "php_${extension}.dll"
+            if (Test-Path $rootDll) {
+              Move-Item $rootDll (Join-Path $extDir "php_${extension}.dll") -Force
+            }
+
+            # Process bin/ folder: keep only required items and remove the folder
+            $binDir = Join-Path $tempDir "bin"
+            if (Test-Path $binDir) {
+              # Move sasl2\plugin_sasldb.dll to top-level sasl2\ if present
+              $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
+              if (Test-Path $saslPlugin) {
+                $sasl2Dir = Join-Path $tempDir "sasl2"
+                New-Item -ItemType Directory -Path $sasl2Dir -Force | Out-Null
+                if (-not (Test-Path (Join-Path $sasl2Dir "plugin_sasldb.dll"))) {
+                  Move-Item $saslPlugin (Join-Path $sasl2Dir "plugin_sasldb.dll") -Force
+                }
+              }
+              Remove-Item $binDir -Recurse -Force
+            }
+
+            # Drop *.lib and *.pdb debug/import files
+            Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
+
+            # Move everything except dlls/ext/3rd-party/sasl2 (and Imagick config) into 3rd-party/<ext>/
+            Get-ChildItem -Path $tempDir | Where-Object {
+              $_.Name -ne 'ext' -and
+              $_.Name -ne '3rd-party' -and
+              $_.Name -ne 'sasl2' -and
+              ( $_.PSIsContainer -or ($_.Extension -notin @('.dll')) ) -and
+              -not ( $extension -eq 'imagick' -and $_.PSIsContainer -and $_.Name -eq 'config' )
+            } | ForEach-Object {
+              Move-Item -Path $_.FullName -Destination (Join-Path $thirdPartyDir $_.Name) -Force
+            }
+
+            # Pack the normalized folder structure into the final asset
+            Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
+          }
+          finally {
+            if (Test-Path $tempDir) { Remove-Item $tempDir -Recurse -Force }
+          }
+
+          Write-Host "Uploading $releaseAssetName to release $releaseTag"
+          gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
+
+          # Targeted cleanup: delete only artifacts of this job that correspond to the uploaded asset
+          Write-Host "=== Deleting only related artifacts after successful release upload ==="
+          try {
+            $runId = "${{ github.run_id }}"
+            $repo = "${{ github.repository }}"
+
+            # Candidate artifact names that might have been uploaded by this job
+            $candidateNames = @($artifactName, $artifactNameModern, $releaseAssetName) | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique
+
+            # Fetch artifacts of this run (id and name) and delete only matching ones
+            $artifacts = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[] | {id: .id, name: .name}' 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
+            if ($null -eq $artifacts) {
+              Write-Host "No artifacts data returned for this run"
+            } else {
+              foreach ($a in $artifacts) {
+                if ($candidateNames -contains $a.name) {
+                  Write-Host "Deleting artifact ID $($a.id) with name '$($a.name)'"
+                  gh api -X DELETE "repos/$repo/actions/artifacts/$($a.id)" | Out-Null
+                }
+              }
+            }
+          } catch {
+            Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
           }
 
   cleanup-release:
@@ -310,6 +314,7 @@ jobs:
           extension_url="${{ inputs.extension-url }}"
           extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
 
+          # Replace some repository names with extension names used in releases
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -323,6 +328,7 @@ jobs:
           esac
 
           ref="${{ inputs.extension-ref }}"
+          # Strip 'v' prefix from version for the release tag
           ref_clean=$(echo "$ref" | sed 's/^v//')
           release_tag="${extension}-${ref_clean}"
 
