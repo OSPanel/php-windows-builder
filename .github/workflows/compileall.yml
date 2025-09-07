@@ -96,7 +96,7 @@ jobs:
                 # ts/nts by extension name
                 if [[ "$extension_name" == *"parallel"* ]]; then
                     ts_list="ts"
-                elif [[ "$extension_name" == *"WINCACHE"* ]]; then
+                elif [[ "$extension_name" == *"wincache"* ]]; then
                     ts_list="nts"
                 else
                     ts_list="nts,ts"
