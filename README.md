@@ -1,4 +1,4 @@
-# PHP and Extensions Pack Build Repository for OSPanel
+# PHP and Extensions Pack Build Repository
 
 This repository provides automated builds of **PHP** and a **PHP Extensions Pack** for the **OSPanel** project.
 
@@ -8,7 +8,7 @@ As a result, these binaries are **not compatible** with the official PHP builds 
 
 ---
 
-# Репозиторий сборки PHP и пакета расширений для OSPanel
+# Репозиторий сборки PHP и пакета расширений
 
 Данный репозиторий предназначен для автоматизированной генерации **сборок PHP** и **набора PHP‑расширений** (Extensions Pack), используемых в проекте **OSPanel**.
 
