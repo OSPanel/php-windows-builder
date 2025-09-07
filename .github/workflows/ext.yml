@@ -196,7 +196,7 @@ jobs:
           processed=0
           while IFS= read -r row; do
             if [[ -n "$row" ]]; then
-              ext=$(echo "$row" | jq -r '.ext')
+              ext=$(echo "$row" | jq -r '.ext' | tr '[:upper:]' '[:lower:]')
               ver=$(echo "$row" | jq -r '.ver')
               original_ext="$ext"
 
@@ -446,9 +446,6 @@ jobs:
           1. Download the appropriate pack for your PHP version and thread safety mode
           2. Extract the archive to your PHP installation directory
           3. Restart your web server
-
-          🎯 **Naming Convention:**
-          \`php-ext-pack-{VERSION}-{TS/NTS}-Win32-{TOOLSET}-x64.zip\`
 
           🛠️ **Toolset Mapping:**
           - \`vc15\` - Visual Studio 2017 (PHP 7.x)
