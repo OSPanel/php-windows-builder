@@ -1,4 +1,4 @@
-name: Delete All
+name: 🗑️ Delete All Runs and Artifacts
 
 on:
   workflow_dispatch:
@@ -19,23 +19,58 @@ jobs:
 
       - name: 🔧 Setup GitHub CLI and authenticate
         run: |
-          # Check GitHub CLI availability
+          # Check GitHub CLI version
           gh --version
 
-          # Authenticate with token
-          echo "${{ secrets.GITHUB_TOKEN }}" | gh auth login --with-token
-
+          # GitHub CLI automatically uses GITHUB_TOKEN from environment
           # Verify authentication
           gh auth status
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: 🛑 Cancel all running workflow runs (except current)
+        run: |
+          echo "🛑 Cancelling all running workflow runs (except current)..."
+
+          # Get all running workflow runs (excluding current one)
+          current_run_id="${{ github.run_id }}"
+          running_runs=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq ".workflow_runs[] | select(.status == \"in_progress\" or .status == \"queued\") | select(.id != $current_run_id) | .id" \
+            2>/dev/null || echo "")
+
+          if [ -z "$running_runs" ]; then
+            echo "🏃 No running workflow runs found (except current one)."
+          else
+            run_count=$(echo "$running_runs" | wc -l)
+            echo "🏃 Found $run_count running workflow runs to cancel"
+
+            counter=0
+            for run_id in $running_runs; do
+              counter=$((counter + 1))
+              echo "🛑 [$counter/$run_count] Cancelling workflow run ID: $run_id"
+              # Using --force flag from GitHub CLI 2.78.0
+              if gh run cancel $run_id --force >/dev/null 2>&1; then
+                echo "✅ Workflow run $run_id cancelled"
+              else
+                echo "❌ Failed to cancel workflow run $run_id"
+              fi
+            done
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: ⏳ Wait for cancellations to complete
+        run: |
+          echo "⏳ Waiting 30 seconds for cancellations to complete..."
+          sleep 30
 
       - name: 🗑️ Delete all artifacts
         run: |
           echo "⚠️ Deleting all artifacts for repository ${{ github.repository }}..."
 
           # Get all artifacts and delete them
-          artifact_ids=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.artifacts[].id' 2>/dev/null || echo "")
+          artifact_ids=$(gh api repos/${{ github.repository }}/actions/artifacts \
+            --jq '.artifacts[].id' 2>/dev/null || echo "")
 
           if [ -z "$artifact_ids" ]; then
             echo "📦 No artifacts found."
@@ -50,23 +85,25 @@ jobs:
               if gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$artifact_id" >/dev/null 2>&1; then
                 echo "✅ Artifact $artifact_id deleted"
               else
-                echo "❌ Failed to delete artifact $artifact_id"
+                echo "❌ Failed to delete artifact $artifact_id (may have expired)"
               fi
             done
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🗑️ Delete all workflow runs
+      - name: 🗑️ Delete all workflow runs (except current)
         run: |
           echo "⚠️ Deleting all workflow runs for repository ${{ github.repository }}..."
+          echo "ℹ️ Current run (${{ github.run_id }}) will be preserved and NOT deleted"
 
-          # Get all workflow runs and delete them (excluding current run)
+          # Get all workflow runs except current one
           current_run_id="${{ github.run_id }}"
-          run_ids=$(gh api repos/${{ github.repository }}/actions/runs --jq ".workflow_runs[] | select(.id != $current_run_id) | .id" 2>/dev/null || echo "")
+          run_ids=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq ".workflow_runs[] | select(.id != $current_run_id) | .id" 2>/dev/null || echo "")
 
           if [ -z "$run_ids" ]; then
-            echo "🏃 No workflow runs found (except current one)."
+            echo "🏃 No workflow runs found to delete (except current one)."
           else
             run_count=$(echo "$run_ids" | wc -l)
             echo "🏃 Found $run_count workflow runs to delete"
@@ -90,22 +127,35 @@ jobs:
           echo "🔍 Verifying cleanup results..."
 
           # Check remaining artifacts
-          remaining_artifacts=$(gh api repos/${{ github.repository }}/actions/artifacts --jq '.total_count' 2>/dev/null || echo "0")
+          remaining_artifacts=$(gh api repos/${{ github.repository }}/actions/artifacts \
+            --jq '.total_count' 2>/dev/null || echo "0")
           echo "📦 Remaining artifacts: $remaining_artifacts"
 
-          # Check remaining runs (excluding current one)
-          current_run_id="${{ github.run_id }}"
-          remaining_runs=$(gh api repos/${{ github.repository }}/actions/runs --jq ".total_count - 1" 2>/dev/null || echo "0")
-          echo "🏃 Remaining workflow runs (except current): $remaining_runs"
+          # Check remaining runs (should be 1 - current run)
+          total_runs=$(gh api repos/${{ github.repository }}/actions/runs \
+            --jq '.total_count' 2>/dev/null || echo "0")
+          remaining_runs=$((total_runs - 1))
+
+          echo "🏃 Total workflow runs: $total_runs"
+          echo "🏃 Other workflow runs (excluding current): $remaining_runs"
+          echo "🛡️ Current run (${{ github.run_id }}) preserved"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: ✅ Cleanup completed
+      - name: ✅ Cleanup completed successfully
         run: |
           echo "🎉 Cleanup completed successfully!"
           echo "📊 Repository: ${{ github.repository }}"
           echo "⏰ Completion time: $(date)"
-          echo "ℹ️ Current run (${{ github.run_id }}) will be deleted automatically after completion"
+          echo "🔧 GitHub CLI version: $(gh --version | head -n1)"
+          echo ""
+          echo "📋 Summary:"
+          echo "  ✅ All artifacts deleted"
+          echo "  ✅ All workflow runs deleted (except current)"
+          echo "  🛡️ Current workflow run preserved"
+          echo "  🆔 Current run ID: ${{ github.run_id }}"
+          echo ""
+          echo "ℹ️ This workflow run will remain in the history for reference"
 
   cancel-action:
     runs-on: ubuntu-latest
@@ -118,4 +168,5 @@ jobs:
           echo "🔒 To confirm deletion, type 'DELETE' in the confirm field."
           echo "⚠️ This action will delete ALL artifacts and workflow runs in the repository!"
           echo "📊 Repository: ${{ github.repository }}"
+          echo "🛡️ The current workflow run will always be preserved"
           exit 1
