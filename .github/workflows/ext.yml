@@ -608,6 +608,29 @@ jobs:
           Write-Host "❌ Failed: $failCount extensions" -ForegroundColor $(if ($failCount -gt 0) { 'Red' } else { 'Green' })
           Write-Host ""
 
+      - name: 🔧 Configure delegates.xml
+        shell: pwsh
+        run: |
+          $target = "${{ steps.toolset.outputs.target }}"
+          $phpVersion = "${{ matrix.php }}"
+          $tsMode = "${{ matrix.ts }}".ToUpper()
+
+          Write-Host "🔧 Configuring delegates.xml for PHP $phpVersion ($tsMode)..." -ForegroundColor Cyan
+
+          $delegatesPath = Join-Path $target "config\delegates.xml"
+
+          if (Test-Path $delegatesPath) {
+            Write-Host "📝 Found delegates.xml, updating PSDelegate references..." -ForegroundColor Yellow
+
+            $content = Get-Content $delegatesPath -Raw -Encoding UTF8
+            $updatedContent = $content -replace '@PSDelegate@', 'gswin64c.exe'
+            Set-Content $delegatesPath $updatedContent -Encoding UTF8
+
+            Write-Host "✅ Updated delegates.xml: @PSDelegate@ -> gswin64c.exe" -ForegroundColor Green
+          } else {
+            Write-Host "⚠️ delegates.xml not found at: $delegatesPath" -ForegroundColor Yellow
+          }
+
       - name: 📦 Pack final result
         id: pack
         shell: pwsh
