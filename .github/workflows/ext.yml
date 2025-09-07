@@ -209,7 +209,7 @@ jobs:
               fi
 
               tag="${ext}-${ver_clean}"
-              file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
+              file="php_${ext}-${ver_clean}-${PHP}-${TS}-${TOOL}-x64.zip"
               url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
               PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
 
