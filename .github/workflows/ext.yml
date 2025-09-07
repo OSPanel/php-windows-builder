@@ -58,7 +58,7 @@ jobs:
               fi
             done
           else
-            PHP_VERS=(${ALL_PHP_VERS})
+            readarray -t PHP_VERS <<< "$ALL_PHP_VERS"
           fi
 
           if [[ ${#PHP_VERS[@]} -eq 0 ]]; then
@@ -68,15 +68,19 @@ jobs:
 
           IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
 
-          MATRIX_JSON='{"include":['
-          SEP=""
+          # Use jq to properly construct JSON
+          MATRIX_ITEMS=()
           for phpv in "${PHP_VERS[@]}"; do
             for ts in "${TS_VALUES[@]}"; do
-              MATRIX_JSON+="${SEP}{\"php\":\"${phpv}\",\"ts\":\"${ts}\"}"
-              SEP=","
+              ts_trim=$(echo "$ts" | xargs)
+              MATRIX_ITEMS+=("{\"php\":\"${phpv}\",\"ts\":\"${ts_trim}\"}")
             done
           done
-          MATRIX_JSON+="]}"
+
+          # Join array elements and create proper JSON
+          printf -v ITEMS_STR '%s,' "${MATRIX_ITEMS[@]}"
+          ITEMS_STR="${ITEMS_STR%,}"  # Remove trailing comma
+          MATRIX_JSON="{\"include\":[${ITEMS_STR}]}"
 
           echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
 
