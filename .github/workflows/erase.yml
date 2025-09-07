@@ -2,16 +2,10 @@ name: 🗑️ Delete All Runs and Artifacts
 
 on:
   workflow_dispatch:
-    inputs:
-      confirm:
-        description: 'Type "DELETE" to confirm deletion of ALL runs and artifacts'
-        required: true
-        default: ''
 
 jobs:
   delete-all:
     runs-on: ubuntu-latest
-    if: github.event.inputs.confirm == 'DELETE'
 
     steps:
       - name: 🛡️ Checkout repository
@@ -32,30 +26,57 @@ jobs:
         run: |
           echo "🛑 Cancelling all running workflow runs (except current)..."
 
-          # Get all running workflow runs (excluding current one)
           current_run_id="${{ github.run_id }}"
-          running_runs=$(gh api repos/${{ github.repository }}/actions/runs \
-            --jq ".workflow_runs[] | select(.status == \"in_progress\" or .status == \"queued\") | select(.id != $current_run_id) | .id" \
-            2>/dev/null || echo "")
+          page=1
+          total_cancelled=0
 
-          if [ -z "$running_runs" ]; then
-            echo "🏃 No running workflow runs found (except current one)."
-          else
+          while true; do
+            echo "📖 Processing page $page for running workflows..."
+
+            # Get running workflows with pagination (100 per page)
+            running_runs=$(gh api repos/${{ github.repository }}/actions/runs \
+              --jq ".workflow_runs[] | select(.status == \"in_progress\" or .status == \"queued\") | select(.id != $current_run_id) | .id" \
+              -f per_page=100 -f page=$page 2>/dev/null || echo "")
+
+            if [ -z "$running_runs" ]; then
+              if [ $page -eq 1 ]; then
+                echo "🏃 No running workflow runs found (except current one)."
+              fi
+              break
+            fi
+
             run_count=$(echo "$running_runs" | wc -l)
-            echo "🏃 Found $run_count running workflow runs to cancel"
+            echo "🏃 Found $run_count running workflow runs on page $page"
 
-            counter=0
-            for run_id in $running_runs; do
-              counter=$((counter + 1))
-              echo "🛑 [$counter/$run_count] Cancelling workflow run ID: $run_id"
-              # Using --force flag from GitHub CLI 2.78.0
+            # Process in batches of 25
+            batch_size=25
+            batch_counter=0
+            temp_file="/tmp/running_runs_page_$page"
+            echo "$running_runs" > "$temp_file"
+
+            while IFS= read -r run_id && [ -n "$run_id" ]; do
+              batch_counter=$((batch_counter + 1))
+              total_cancelled=$((total_cancelled + 1))
+
+              echo "🛑 [$total_cancelled] Cancelling workflow run ID: $run_id"
               if gh run cancel $run_id --force >/dev/null 2>&1; then
                 echo "✅ Workflow run $run_id cancelled"
               else
                 echo "❌ Failed to cancel workflow run $run_id"
               fi
-            done
-          fi
+
+              # Small delay every 25 items to avoid rate limiting
+              if [ $((batch_counter % batch_size)) -eq 0 ]; then
+                echo "⏸️ Batch completed, pausing 2 seconds..."
+                sleep 2
+              fi
+            done < "$temp_file"
+
+            rm -f "$temp_file"
+            page=$((page + 1))
+          done
+
+          echo "🎯 Total workflow runs cancelled: $total_cancelled"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -64,61 +85,131 @@ jobs:
           echo "⏳ Waiting 30 seconds for cancellations to complete..."
           sleep 30
 
-      - name: 🗑️ Delete all artifacts
+      - name: 🗑️ Delete all artifacts with pagination
         run: |
           echo "⚠️ Deleting all artifacts for repository ${{ github.repository }}..."
 
-          # Get all artifacts and delete them
-          artifact_ids=$(gh api repos/${{ github.repository }}/actions/artifacts \
-            --jq '.artifacts[].id' 2>/dev/null || echo "")
+          page=1
+          total_deleted=0
 
-          if [ -z "$artifact_ids" ]; then
-            echo "📦 No artifacts found."
-          else
+          while true; do
+            echo "📖 Processing page $page for artifacts..."
+
+            # Get artifacts with pagination (100 per page)
+            artifact_data=$(gh api repos/${{ github.repository }}/actions/artifacts \
+              -f per_page=100 -f page=$page 2>/dev/null || echo "")
+
+            if [ -z "$artifact_data" ]; then
+              echo "❌ Failed to fetch artifacts data"
+              break
+            fi
+
+            artifact_ids=$(echo "$artifact_data" | jq -r '.artifacts[].id' 2>/dev/null || echo "")
+
+            if [ -z "$artifact_ids" ] || [ "$artifact_ids" = "null" ]; then
+              if [ $page -eq 1 ]; then
+                echo "📦 No artifacts found."
+              fi
+              break
+            fi
+
             artifact_count=$(echo "$artifact_ids" | wc -l)
-            echo "📦 Found $artifact_count artifacts to delete"
+            echo "📦 Found $artifact_count artifacts on page $page"
 
-            counter=0
-            for artifact_id in $artifact_ids; do
-              counter=$((counter + 1))
-              echo "🗑️ [$counter/$artifact_count] Deleting artifact ID: $artifact_id"
+            # Process in batches of 25
+            batch_size=25
+            batch_counter=0
+            temp_file="/tmp/artifacts_page_$page"
+            echo "$artifact_ids" > "$temp_file"
+
+            while IFS= read -r artifact_id && [ -n "$artifact_id" ]; do
+              batch_counter=$((batch_counter + 1))
+              total_deleted=$((total_deleted + 1))
+
+              echo "🗑️ [$total_deleted] Deleting artifact ID: $artifact_id"
               if gh api --method DELETE "repos/${{ github.repository }}/actions/artifacts/$artifact_id" >/dev/null 2>&1; then
                 echo "✅ Artifact $artifact_id deleted"
               else
                 echo "❌ Failed to delete artifact $artifact_id (may have expired)"
               fi
-            done
-          fi
+
+              # Small delay every 25 items to avoid rate limiting
+              if [ $((batch_counter % batch_size)) -eq 0 ]; then
+                echo "⏸️ Batch completed, pausing 2 seconds..."
+                sleep 2
+              fi
+            done < "$temp_file"
+
+            rm -f "$temp_file"
+            page=$((page + 1))
+          done
+
+          echo "🎯 Total artifacts deleted: $total_deleted"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: 🗑️ Delete all workflow runs (except current)
+      - name: 🗑️ Delete all workflow runs with pagination (except current)
         run: |
           echo "⚠️ Deleting all workflow runs for repository ${{ github.repository }}..."
           echo "ℹ️ Current run (${{ github.run_id }}) will be preserved and NOT deleted"
 
-          # Get all workflow runs except current one
           current_run_id="${{ github.run_id }}"
-          run_ids=$(gh api repos/${{ github.repository }}/actions/runs \
-            --jq ".workflow_runs[] | select(.id != $current_run_id) | .id" 2>/dev/null || echo "")
+          page=1
+          total_deleted=0
 
-          if [ -z "$run_ids" ]; then
-            echo "🏃 No workflow runs found to delete (except current one)."
-          else
+          while true; do
+            echo "📖 Processing page $page for workflow runs..."
+
+            # Get workflow runs with pagination (100 per page)
+            run_data=$(gh api repos/${{ github.repository }}/actions/runs \
+              -f per_page=100 -f page=$page 2>/dev/null || echo "")
+
+            if [ -z "$run_data" ]; then
+              echo "❌ Failed to fetch workflow runs data"
+              break
+            fi
+
+            run_ids=$(echo "$run_data" | jq -r ".workflow_runs[] | select(.id != $current_run_id) | .id" 2>/dev/null || echo "")
+
+            if [ -z "$run_ids" ] || [ "$run_ids" = "null" ]; then
+              if [ $page -eq 1 ]; then
+                echo "🏃 No workflow runs found to delete (except current one)."
+              fi
+              break
+            fi
+
             run_count=$(echo "$run_ids" | wc -l)
-            echo "🏃 Found $run_count workflow runs to delete"
+            echo "🏃 Found $run_count workflow runs on page $page"
 
-            counter=0
-            for run_id in $run_ids; do
-              counter=$((counter + 1))
-              echo "🗑️ [$counter/$run_count] Deleting workflow run ID: $run_id"
+            # Process in batches of 25
+            batch_size=25
+            batch_counter=0
+            temp_file="/tmp/runs_page_$page"
+            echo "$run_ids" > "$temp_file"
+
+            while IFS= read -r run_id && [ -n "$run_id" ]; do
+              batch_counter=$((batch_counter + 1))
+              total_deleted=$((total_deleted + 1))
+
+              echo "🗑️ [$total_deleted] Deleting workflow run ID: $run_id"
               if gh api --method DELETE "repos/${{ github.repository }}/actions/runs/$run_id" >/dev/null 2>&1; then
                 echo "✅ Workflow run $run_id deleted"
               else
                 echo "❌ Failed to delete workflow run $run_id"
               fi
-            done
-          fi
+
+              # Small delay every 25 items to avoid rate limiting
+              if [ $((batch_counter % batch_size)) -eq 0 ]; then
+                echo "⏸️ Batch completed, pausing 2 seconds..."
+                sleep 2
+              fi
+            done < "$temp_file"
+
+            rm -f "$temp_file"
+            page=$((page + 1))
+          done
+
+          echo "🎯 Total workflow runs deleted: $total_deleted"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -150,23 +241,9 @@ jobs:
           echo "🔧 GitHub CLI version: $(gh --version | head -n1)"
           echo ""
           echo "📋 Summary:"
-          echo "  ✅ All artifacts deleted"
+          echo "  ✅ All artifacts deleted (with pagination)"
           echo "  ✅ All workflow runs deleted (except current)"
           echo "  🛡️ Current workflow run preserved"
           echo "  🆔 Current run ID: ${{ github.run_id }}"
           echo ""
           echo "ℹ️ This workflow run will remain in the history for reference"
-
-  cancel-action:
-    runs-on: ubuntu-latest
-    if: github.event.inputs.confirm != 'DELETE'
-
-    steps:
-      - name: ❌ Action cancelled
-        run: |
-          echo "❌ Action cancelled!"
-          echo "🔒 To confirm deletion, type 'DELETE' in the confirm field."
-          echo "⚠️ This action will delete ALL artifacts and workflow runs in the repository!"
-          echo "📊 Repository: ${{ github.repository }}"
-          echo "🛡️ The current workflow run will always be preserved"
-          exit 1
