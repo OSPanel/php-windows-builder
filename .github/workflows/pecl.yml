@@ -197,36 +197,46 @@ jobs:
             # Rename the artifact file to the new naming scheme if needed
             if ($finalName -ne $releaseAssetName) {
               Copy-Item $builtFile $releaseAssetName
+              Write-Host "Renamed artifact to: $releaseAssetName"
             } else {
               $releaseAssetName = $builtFile
+              Write-Host "Using original artifact name: $releaseAssetName"
             }
             
             # Create temporary folder for archive processing
             $tempDir = Join-Path $env:TEMP "extension_processing_$(Get-Random)"
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
+            Write-Host "Created temporary directory: $tempDir"
             
             try {
               # Extract archive to temporary folder
-              Write-Host "Extracting archive to temp directory: $tempDir"
+              Write-Host "Extracting archive to temp directory..."
               Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
               Remove-Item $releaseAssetName -Force
+              Write-Host "Archive extracted and original removed"
               
               # Create subfolders
+              Write-Host "Creating subfolders..."
               $extDir = Join-Path $tempDir "ext"
               $extConfigDir = Join-Path $tempDir "ext-config"
               $thirdPartyDir = Join-Path $tempDir "3rd-party"
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $extConfigDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
+              Write-Host "Subfolders created: ext, ext-config, 3rd-party"
               
               # Process files recursively (except bin folder)
+              Write-Host "Processing files recursively (excluding bin folder)..."
+              $filesProcessed = 0
               Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { $_.FullName -notmatch [regex]::Escape((Join-Path $tempDir "bin")) } | ForEach-Object {
                 $file = $_
                 $fileName = $file.Name
+                $filesProcessed++
                 
                 if ($fileName -eq "php_${extension}.dll") {
                   # Move main DLL to ext
                   Move-Item $file.FullName -Destination $extDir
+                  Write-Host "Moved main DLL: $fileName to ext/"
                 } elseif ($fileName -notmatch "\.dll$") {
                   # Move other files (non-DLL) to 3rd-party
                   $relativePath = $file.FullName.Substring($tempDir.Length + 1)
@@ -236,17 +246,24 @@ jobs:
                     New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
                   }
                   Move-Item $file.FullName -Destination $targetPath
+                  if ($filesProcessed % 10 -eq 0) {
+                    Write-Host "Processed $filesProcessed files..."
+                  }
                 }
               }
+              Write-Host "Finished processing $filesProcessed files"
               
               # Process bin folder separately
+              Write-Host "Processing bin folder..."
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
+                Write-Host "Bin folder found, processing special files..."
                 # Move openssl.exe and tidy.exe to root
                 @("openssl.exe", "tidy.exe") | ForEach-Object {
                   $binFile = Join-Path $binDir $_
                   if (Test-Path $binFile) {
                     Move-Item $binFile -Destination (Join-Path $tempDir $_)
+                    Write-Host "Moved $_ to root"
                   }
                 }
                 
@@ -256,55 +273,78 @@ jobs:
                   $saslDir = Join-Path $tempDir "sasl2"
                   New-Item -ItemType Directory -Path $saslDir -Force | Out-Null
                   Move-Item $saslPlugin -Destination (Join-Path $saslDir "plugin_sasldb.dll")
+                  Write-Host "Moved sasl2/plugin_sasldb.dll to root/sasl2/"
                 }
+              } else {
+                Write-Host "No bin folder found"
               }
               
               # Remove unnecessary files and folders
-              Get-ChildItem -Path $tempDir -Recurse -Include "*.lib", "*.pdb" | Remove-Item -Force
+              Write-Host "Removing unnecessary files and folders..."
+              $libPdbFiles = Get-ChildItem -Path $tempDir -Recurse -Include "*.lib", "*.pdb"
+              Write-Host "Found $($libPdbFiles.Count) .lib/.pdb files to remove"
+              $libPdbFiles | Remove-Item -Force
+              
               @("bin", "3rd-party\imagick\config") | ForEach-Object {
                 $pathToRemove = Join-Path $tempDir $_
                 if (Test-Path $pathToRemove) {
                   Remove-Item $pathToRemove -Recurse -Force
+                  Write-Host "Removed folder: $_"
                 }
               }
               
               # Remove imagick-specific files
               if ($extension -eq "imagick") {
-                Get-ChildItem -Path $tempDir -Recurse -Include "IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_*.dll" | Remove-Item -Force
+                Write-Host "Extension is imagick, removing specific DLL files..."
+                $imagickDlls = Get-ChildItem -Path $tempDir -Recurse -Include "IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_*.dll"
+                Write-Host "Found $($imagickDlls.Count) imagick-specific DLL files to remove"
+                $imagickDlls | Remove-Item -Force
               }
               
               # Download matrix files
+              Write-Host "Downloading matrix files..."
               $matrixIniUrl = "https://raw.githubusercontent.com/OSPanel/OpenServerPanel/refs/heads/main/resources/matrix/matrix-ini.json"
               $matrixCommentsUrl = "https://raw.githubusercontent.com/OSPanel/OpenServerPanel/refs/heads/main/resources/matrix/matrix-ini-comments.json"
               
               $matrixIniPath = Join-Path $tempDir "matrix-ini.json"
               $matrixCommentsPath = Join-Path $tempDir "matrix-ini-comments.json"
               
+              Write-Host "Downloading matrix-ini.json..."
               Invoke-WebRequest -Uri $matrixIniUrl -OutFile $matrixIniPath
+              Write-Host "Downloading matrix-ini-comments.json..."
               Invoke-WebRequest -Uri $matrixCommentsUrl -OutFile $matrixCommentsPath
+              Write-Host "Matrix files downloaded successfully"
               
               # Parse JSON files
+              Write-Host "Parsing JSON files..."
               $matrixIni = Get-Content $matrixIniPath -Raw | ConvertFrom-Json
               $matrixComments = Get-Content $matrixCommentsPath -Raw | ConvertFrom-Json
+              Write-Host "JSON files parsed, found $($matrixIni.Count) ini entries and $($matrixComments.Count) comment entries"
               
               # Create comments dictionary
+              Write-Host "Creating comments dictionary..."
               $commentMap = @{}
               foreach ($comment in $matrixComments) {
                 $commentMap[$comment.parameter] = $comment.comment
               }
+              Write-Host "Comments dictionary created with $($commentMap.Count) entries"
               
               # Filter data for current extension
+              Write-Host "Filtering data for extension: $extension"
               $extensionData = $matrixIni | Where-Object { $_.extension -eq $extension }
+              Write-Host "Found $($extensionData.Count) configuration entries for extension $extension"
               
               if ($extensionData) {
                 # Determine PHP version for selecting correct values
                 $phpVersionKey = "${{ matrix.php-version }}"
+                Write-Host "Processing configuration for PHP version: $phpVersionKey"
                 
                 # Create INI file
                 $iniPath = Join-Path $extConfigDir "${extension}.ini"
                 $lines = New-Object System.Collections.Generic.List[string]
                 
                 # Group by extension
+                Write-Host "Building INI configuration..."
                 $rows = @()
                 foreach ($row in $extensionData) {
                   $param = [string]$row.parameter
@@ -329,6 +369,8 @@ jobs:
                     IsCommented = (-not $useFlag)
                   }
                 }
+                
+                Write-Host "Built $($rows.Count) configuration rows"
                 
                 if ($rows.Count -gt 0) {
                   # Position for aligning equals sign
@@ -372,20 +414,26 @@ jobs:
                 # Write INI file
                 Set-Content -Path $iniPath -Encoding UTF8 -Value ($lines -join [Environment]::NewLine)
                 Write-Host "Generated INI config: $iniPath"
+              } else {
+                Write-Host "No configuration data found for extension $extension"
               }
               
               # Remove temporary matrix files
+              Write-Host "Cleaning up temporary matrix files..."
               Remove-Item $matrixIniPath -Force -ErrorAction SilentlyContinue
               Remove-Item $matrixCommentsPath -Force -ErrorAction SilentlyContinue
               
               # Repackage archive
               Write-Host "Repackaging archive: $releaseAssetName"
               Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
+              Write-Host "Archive repackaged successfully"
               
             } finally {
               # Remove temporary folder
+              Write-Host "Cleaning up temporary directory..."
               if (Test-Path $tempDir) {
                 Remove-Item $tempDir -Recurse -Force
+                Write-Host "Temporary directory removed"
               }
             }
             
