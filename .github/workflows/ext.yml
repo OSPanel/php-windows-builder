@@ -358,6 +358,218 @@ jobs:
           Get-ChildItem -Path $target -Filter *.zip | Remove-Item -Force
           Write-Host "✅ Cleanup completed for PHP $phpVersion ($tsMode)" -ForegroundColor Green
 
+      - name: 🔥 Download and process additional extensions
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Continue'
+          $target = "${{ steps.toolset.outputs.target }}"
+          $phpVersion = "${{ matrix.php }}"
+          $tsMode = "${{ matrix.ts }}".ToLower()
+          $tool = "${{ steps.toolset.outputs.tool }}"
+
+          Write-Host ""
+          Write-Host "🔥 Processing additional extensions for PHP $phpVersion ($($tsMode.ToUpper()))" -ForegroundColor Cyan
+          Write-Host "=================================================================" -ForegroundColor Cyan
+
+          # Create ext and 3rd-party directories if they don't exist
+          $extDir = Join-Path $target "ext"
+          $thirdPartyDir = Join-Path $target "3rd-party"
+
+          if (-not (Test-Path $extDir)) {
+            New-Item -ItemType Directory -Path $extDir -Force | Out-Null
+            Write-Host "📁 Created ext directory" -ForegroundColor Green
+          }
+
+          if (-not (Test-Path $thirdPartyDir)) {
+            New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
+            Write-Host "📁 Created 3rd-party directory" -ForegroundColor Green
+          }
+
+          # Define extension configurations
+          $extensionConfigs = @{
+            "blackfire" = @{
+              "name" = "Blackfire"
+              "urls" = @{
+                "7.2" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/72"
+                "7.3" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/73"
+                "7.4" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/74"
+                "8.0" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/80"
+                "8.1" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/81"
+                "8.2" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/82"
+                "8.3" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/83"
+                "8.4" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/84"
+              }
+              "dll_name" = "blackfire_php.dll"
+              "target_name" = "php_blackfire.dll"
+            }
+            "ioncube" = @{
+              "name" = "Ioncube"
+              "urls" = @{
+                "7.2" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc15_x86-64.zip"
+                "7.3" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc15_x86-64.zip"
+                "7.4" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc15_x86-64.zip"
+                "8.1" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc16_x86-64.zip"
+                "8.2" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc16_x86-64.zip"
+                "8.3" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc16_x86-64.zip"
+                "8.4" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc17_x86-64.zip"
+              }
+              "dll_name" = "ioncube_loader_win_$phpVersion.dll"
+              "target_name" = "php_ioncube.dll"
+            }
+            "firebird" = @{
+              "name" = "Firebird"
+              "urls" = @{
+                "7.3" = "https://github.com/FirebirdSQL/firebird/releases/download/v3.0.13/Firebird-3.0.13.33818-0-x64.zip"
+                "7.4" = "https://github.com/FirebirdSQL/firebird/releases/download/v3.0.13/Firebird-3.0.13.33818-0-x64.zip"
+                "8.0" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+                "8.1" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+                "8.2" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+                "8.3" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+                "8.4" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+              }
+              "dll_name" = "fbclient.dll"
+              "target_name" = "fbclient.dll"
+              "target_location" = "root"  # Special flag for root directory
+            }
+          }
+
+          $successCount = 0
+          $failCount = 0
+
+          foreach ($extKey in $extensionConfigs.Keys) {
+            $config = $extensionConfigs[$extKey]
+            $extName = $config.name
+
+            Write-Host ""
+            Write-Host "🔥 Processing $extName extension..." -ForegroundColor Yellow
+
+            # Check if URL exists for this PHP version
+            if (-not $config.urls.ContainsKey($phpVersion)) {
+              Write-Host "⚠️ Skipping $extName: No URL configured for PHP $phpVersion" -ForegroundColor Yellow
+              continue
+            }
+
+            # Skip Ioncube for TS mode (only NTS supported)
+            if ($extKey -eq "ioncube" -and $tsMode -eq "ts") {
+              Write-Host "⚠️ Skipping $extName: Only NTS mode supported" -ForegroundColor Yellow
+              continue
+            }
+
+            $url = $config.urls[$phpVersion]
+            $dllName = $config.dll_name
+            $targetName = $config.target_name
+
+            try {
+              # Create temporary directory
+              $tmpDir = "$env:TEMP\${extKey}_$(Get-Random)"
+              $archivePath = if ($url.EndsWith(".zip")) { "$tmpDir.zip" } else { "$tmpDir.archive" }
+
+              Write-Host "📥 Downloading $extName from: $url" -ForegroundColor Gray
+
+              # Download archive
+              Invoke-WebRequest -Uri $url -OutFile $archivePath -UseBasicParsing -ErrorAction Stop
+
+              $fileSize = [math]::Round((Get-Item $archivePath).Length / 1MB, 2)
+              Write-Host "✅ Downloaded $extName successfully ($fileSize MB)" -ForegroundColor Green
+
+              # Extract archive
+              Write-Host "📂 Extracting $extName archive..." -ForegroundColor Gray
+              if ($url.EndsWith(".zip")) {
+                Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
+              } else {
+                # For non-zip archives, try to extract anyway
+                try {
+                  Expand-Archive -Path $archivePath -DestinationPath $tmpDir -Force
+                } catch {
+                  Write-Host "⚠️ Could not extract $extName as ZIP, trying to copy as-is" -ForegroundColor Yellow
+                  New-Item -ItemType Directory -Path $tmpDir -Force | Out-Null
+                  Copy-Item $archivePath $tmpDir
+                }
+              }
+
+              # Find the DLL file
+              $dllFile = Get-ChildItem -Path $tmpDir -File -Recurse |
+                        Where-Object { $_.Name -eq $dllName } |
+                        Select-Object -First 1
+
+              if (-not $dllFile) {
+                Write-Host "❌ $extName: DLL file '$dllName' not found in archive" -ForegroundColor Red
+                $failCount++
+                continue
+              }
+
+              # Determine target location
+              $targetLocation = if ($config.ContainsKey("target_location") -and $config.target_location -eq "root") {
+                $target
+              } else {
+                $extDir
+              }
+
+              $targetDllPath = Join-Path $targetLocation $targetName
+
+              # Copy DLL to target location
+              Copy-Item -Path $dllFile.FullName -Destination $targetDllPath -Force
+              $dllSize = [math]::Round((Get-Item $targetDllPath).Length / 1KB, 2)
+              Write-Host "✅ Copied $targetName ($dllSize KB)" -ForegroundColor Green
+
+              # Process remaining files (move to 3rd-party directory)
+              if ($extKey -ne "firebird") {  # Firebird doesn't need 3rd-party files
+                $extThirdPartyDir = Join-Path $thirdPartyDir $extKey
+
+                if (-not (Test-Path $extThirdPartyDir)) {
+                  New-Item -ItemType Directory -Path $extThirdPartyDir -Force | Out-Null
+                }
+
+                $remainingFiles = Get-ChildItem -Path $tmpDir -Recurse -File |
+                                 Where-Object { $_.FullName -ne $dllFile.FullName }
+
+                $movedCount = 0
+                foreach ($file in $remainingFiles) {
+                  try {
+                    $relativePath = $file.FullName.Substring($tmpDir.Length + 1)
+                    $targetPath = Join-Path $extThirdPartyDir $relativePath
+
+                    # Create subdirectory if needed
+                    $targetDir = Split-Path $targetPath -Parent
+                    if (-not (Test-Path $targetDir)) {
+                      New-Item -ItemType Directory -Path $targetDir -Force | Out-Null
+                    }
+
+                    Copy-Item -Path $file.FullName -Destination $targetPath -Force
+                    $movedCount++
+                  } catch {
+                    Write-Host "⚠️ Error copying file $($file.Name): $_" -ForegroundColor Yellow
+                  }
+                }
+
+                if ($movedCount -gt 0) {
+                  Write-Host "📁 Moved $movedCount additional files to 3rd-party/$extKey" -ForegroundColor Green
+                }
+              }
+
+              # Cleanup temporary files
+              Remove-Item $tmpDir, $archivePath -Recurse -Force -ErrorAction SilentlyContinue
+
+              Write-Host "✅ $extName extension processed successfully" -ForegroundColor Green
+              $successCount++
+
+            } catch {
+              Write-Host "❌ Error processing $extName extension: $_" -ForegroundColor Red
+              Write-Host "🔗 URL: $url" -ForegroundColor DarkGray
+              $failCount++
+
+              # Cleanup on error
+              Remove-Item $tmpDir, $archivePath -Recurse -Force -ErrorAction SilentlyContinue
+            }
+          }
+
+          Write-Host ""
+          Write-Host "📊 Additional Extensions Summary for PHP $phpVersion ($($tsMode.ToUpper()))" -ForegroundColor Cyan
+          Write-Host "=================================================" -ForegroundColor Cyan
+          Write-Host "✅ Successful: $successCount extensions" -ForegroundColor Green
+          Write-Host "❌ Failed: $failCount extensions" -ForegroundColor $(if ($failCount -gt 0) { 'Red' } else { 'Green' })
+          Write-Host ""
+
       - name: 📦 Pack final result
         id: pack
         shell: pwsh
@@ -460,6 +672,7 @@ jobs:
           - Support for multiple PHP versions (7.x, 8.x)
           - Both Thread Safe (TS) and Non-Thread Safe (NTS) variants
           - Compiled with appropriate Visual Studio toolsets
+          - Additional extensions: Blackfire, Ioncube (NTS only), Firebird client
 
           ⚡ **Quick Installation:**
           1. Download the appropriate pack for your PHP version and thread safety mode
@@ -470,6 +683,11 @@ jobs:
           - \`vc15\` - Visual Studio 2017 (PHP 7.x)
           - \`vs16\` - Visual Studio 2019 (PHP 8.0-8.3)
           - \`vs17\` - Visual Studio 2022 (PHP 8.4+)
+
+          🔥 **Additional Extensions:**
+          - **Blackfire**: Performance profiling (all PHP versions, TS/NTS)
+          - **Ioncube**: Code encryption loader (NTS only)
+          - **Firebird**: Database client library (PHP 7.3+)
 
           🤖 **Auto-generated** by GitHub Actions on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
