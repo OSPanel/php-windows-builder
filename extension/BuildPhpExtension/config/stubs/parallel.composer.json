@@ -1,0 +1,15 @@
+{
+    "require":
+    {
+        "libxml2": "*",
+        "sqlite3": "*",
+        pthreads
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "with-parallel=shared"
+        }]
+    }
+}
