@@ -232,16 +232,6 @@ jobs:
               # Step 5 & 6: Process bin folder
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
-                # Move openssl.exe and tidy.exe to root if they exist
-                foreach ($fileName in @("openssl.exe", "tidy.exe")) {
-                  $filePath = Join-Path $binDir $fileName
-                  if (Test-Path $filePath) {
-                    $destPath = Join-Path $tempDir $fileName
-                    Move-Item $filePath $destPath -Force
-                    Write-Host "Moved $fileName to root"
-                  }
-                }
-                
                 # Move sasl2\plugin_sasldb.dll from bin to root as sasl2\plugin_sasldb.dll
                 $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
                 if (Test-Path $saslPlugin) {
