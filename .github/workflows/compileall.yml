@@ -8,11 +8,16 @@ on:
         required: false
         default: '200'
         type: string
+      extensions:
+        description: 'Comma-separated extension names to process (optional)'
+        required: false
+        default: ''
+        type: string
 
 jobs:
   compile-extensions:
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -24,6 +29,7 @@ jobs:
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         MAX_COUNT: ${{ github.event.inputs.max_extensions }}
+        EXTENSIONS: ${{ github.event.inputs.extensions }}
       run: |
         #!/bin/bash
 
@@ -35,6 +41,7 @@ jobs:
         set -e
 
         echo "▶️ Start: compile all extensions (max: ${MAX_COUNT:-200})"
+        [ -n "${EXTENSIONS// }" ] && echo "📝 Requested extensions: ${EXTENSIONS}"
 
         # Function to trigger workflow for a single extension
         trigger_extension_workflow() {
@@ -165,24 +172,53 @@ jobs:
             exit 1
         fi
 
-        # Read extension list
+        # Read all extension keys from matrix
         all_extensions=$(jq -r 'keys[]' "$matrix_path" 2>/dev/null || echo "")
         if [ -z "$all_extensions" ]; then
             echo "❌ Failed to read extensions list from matrix.json"
             exit 1
         fi
-
         readarray -t all_extensions_array <<< "$all_extensions"
         if [ ${#all_extensions_array[@]} -eq 0 ]; then
             echo "❌ No extensions found in matrix.json"
             exit 1
         fi
 
-        # Limit by max_count
-        to_process=("${all_extensions_array[@]:0:$max_count}")
+        # Build processing list
+        to_process=()
+        if [ -n "${EXTENSIONS// }" ]; then
+            declare -a selected=()
+            declare -a unknown=()
+            IFS=',' read -ra requested <<< "$EXTENSIONS"
+            for name in "${requested[@]}"; do
+                name="$(echo "$name" | xargs)"
+                [ -z "$name" ] && continue
+                if jq -e --arg n "$name" 'has($n)' "$matrix_path" >/dev/null; then
+                    selected+=("$name")
+                else
+                    unknown+=("$name")
+                fi
+            done
+
+            if [ ${#unknown[@]} -gt 0 ]; then
+                echo "⚠️ Unknown extensions (skipped): ${unknown[*]}"
+            fi
+
+            if [ ${#selected[@]} -eq 0 ]; then
+                echo "❌ No valid extensions supplied in 'extensions' input"
+                exit 1
+            fi
+
+            # Apply max limit
+            to_process=("${selected[@]:0:$max_count}")
+        else
+            # Fallback to previous behavior (first N from matrix)
+            to_process=("${all_extensions_array[@]:0:$max_count}")
+        fi
 
         total_extensions=${#to_process[@]}
-        echo "📦 Extensions found: $total_extensions"
+        echo "📦 Extensions to process: $total_extensions"
+        echo "🧾 List: ${to_process[*]}"
 
         # Prepare
         successfully_processed=()
