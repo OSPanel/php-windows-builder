@@ -204,40 +204,35 @@ jobs:
             # Repack the archive
             $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
-
+            
             try {
               Write-Host "Extracting and repacking archive: $releaseAssetName"
-
+              
               # Extract archive to temporary directory
               Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
-
+              
               # Remove original archive
               Remove-Item $releaseAssetName -Force
-
+              
               # Create subdirectories
               $extDir = Join-Path $tempDir "ext"
               $thirdPartyDir = Join-Path $tempDir "3rd-party"
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
-
-              # Process all files recursively (excluding bin folder)
-              $allItems = Get-ChildItem -Path $tempDir -Recurse | Where-Object { $_.FullName -notlike "*\bin\*" }
-
-              foreach ($item in $allItems) {
-                if ($item.PSIsContainer) { continue }
-
-                # Move main extension DLL to ext folder
-                if ($item.Name -eq "php_${extension}.dll") {
-                  $destPath = Join-Path $extDir $item.Name
-                  Move-Item $item.FullName $destPath -Force
-                  Write-Host "Moved $($item.Name) to ext folder"
-                }
+              
+              # Step 4: Move main extension DLL to ext folder (process all files recursively except bin)
+              Get-ChildItem -Path $tempDir -Recurse -File | Where-Object { 
+                $_.FullName -notlike "*\bin\*" -and $_.Name -eq "php_${extension}.dll" 
+              } | ForEach-Object {
+                $destPath = Join-Path $extDir $_.Name
+                Move-Item $_.FullName $destPath -Force
+                Write-Host "Moved $($_.Name) to ext folder"
               }
-
-              # Move specific files from bin folder to root
+              
+              # Step 5 & 6: Process bin folder
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
-                # Move openssl.exe and tidy.exe if they exist
+                # Move openssl.exe and tidy.exe to root if they exist
                 foreach ($fileName in @("openssl.exe", "tidy.exe")) {
                   $filePath = Join-Path $binDir $fileName
                   if (Test-Path $filePath) {
@@ -246,8 +241,8 @@ jobs:
                     Write-Host "Moved $fileName to root"
                   }
                 }
-
-                # Move sasl2\plugin_sasldb.dll from bin to root
+                
+                # Move sasl2\plugin_sasldb.dll from bin to root as sasl2\plugin_sasldb.dll
                 $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
                 if (Test-Path $saslPlugin) {
                   $sasl2Dir = Join-Path $tempDir "sasl2"
@@ -257,8 +252,8 @@ jobs:
                   Write-Host "Moved sasl2\plugin_sasldb.dll to root"
                 }
               }
-
-              # Remove ImageMagick files if extension is imagick
+              
+              # Step 7: Remove ImageMagick files if extension is imagick
               if ($extension -eq "imagick") {
                 $imagickPatterns = @("IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_*.dll")
                 foreach ($pattern in $imagickPatterns) {
@@ -266,42 +261,38 @@ jobs:
                   Write-Host "Removed ImageMagick files: $pattern"
                 }
               }
-
-              # Move all remaining files and folders (except *.dll and ext folder) to 3rd-party
-              $remainingItems = Get-ChildItem -Path $tempDir | Where-Object {
-                $_.Name -ne "ext" -and
-                $_.Name -ne "3rd-party" -and
-                (-not $_.PSIsContainer -or $_.Extension -ne ".dll")
+              
+              # Step 8: Move all files and folders (except *.dll files and ext folder) to 3rd-party
+              Get-ChildItem -Path $tempDir | Where-Object { 
+                $_.Name -ne "ext" -and $_.Name -ne "3rd-party" -and
+                ($_.PSIsContainer -or $_.Extension -ne ".dll")
+              } | ForEach-Object {
+                $destPath = Join-Path $thirdPartyDir $_.Name
+                Move-Item $_.FullName $destPath -Force
+                Write-Host "Moved $($_.Name) to 3rd-party"
               }
-
-              foreach ($item in $remainingItems) {
-                if ($item.PSIsContainer -or $item.Extension -ne ".dll") {
-                  $destPath = Join-Path $thirdPartyDir $item.Name
-                  Move-Item $item.FullName $destPath -Force
-                  Write-Host "Moved $($item.Name) to 3rd-party"
-                }
-              }
-
-              # Remove *.lib and *.pdb files recursively
+              
+              # Step 9: Remove *.lib and *.pdb files recursively, remove bin and 3rd-party\imagick\config folders
               Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
               Write-Host "Removed *.lib and *.pdb files"
-
-              # Remove bin folder if it exists
-              if (Test-Path $binDir) {
-                Remove-Item $binDir -Recurse -Force
-                Write-Host "Removed bin folder"
+              
+              # Remove bin folder from 3rd-party if it was moved there
+              $binInThirdParty = Join-Path $thirdPartyDir "bin"
+              if (Test-Path $binInThirdParty) {
+                Remove-Item $binInThirdParty -Recurse -Force
+                Write-Host "Removed bin folder from 3rd-party"
               }
-
+              
               # Remove 3rd-party\imagick\config if it exists
               $imagickConfigDir = Join-Path $thirdPartyDir "imagick\config"
               if (Test-Path $imagickConfigDir) {
                 Remove-Item $imagickConfigDir -Recurse -Force
                 Write-Host "Removed 3rd-party\imagick\config folder"
               }
-
-              # Create new archive
+              
+              # Step 10: Create new archive
               Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
-
+              
             } finally {
               # Clean up temporary directory
               if (Test-Path $tempDir) {
