@@ -46,6 +46,7 @@ on:
 
   repository_dispatch:
     types: [build_extension]
+
 jobs:
   get-extension-matrix:
     runs-on: ubuntu-latest
@@ -63,18 +64,25 @@ jobs:
           php-version-list: ${{ inputs.php-version-list }}
           arch-list: ${{ inputs.arch-list }}
           ts-list: ${{ inputs.ts-list }}
-  create-release:
-    runs-on: ubuntu-latest
+
+  extension:
     needs: get-extension-matrix
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.get-extension-matrix.outputs.matrix) }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Ensure release exists
+        shell: bash
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          set -euo pipefail
           extension_url="${{ inputs.extension-url }}"
-          extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          
-          # Replace extension names
+          extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -88,25 +96,16 @@ jobs:
           esac
 
           ref="${{ inputs.extension-ref }}"
-          # Remove 'v' prefix from version
-          ref=$(echo "$ref" | sed 's/^v//')
-          release_tag="${extension}-${ref}"
-        
+          ref_clean="$(echo "$ref" | sed 's/^v//')"
+          release_tag="${extension}-${ref_clean}"
+
           if ! gh release view "${release_tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
             gh release create "${release_tag}" \
-              -t "${extension} ${ref}" \
-              -n "Release of PECL extension '${extension}' version ${ref}" \
+              -t "${extension} ${ref_clean}" \
+              -n "Release of PECL extension '${extension}' version ${ref_clean}" \
               -R ${{ github.repository }}
           fi
-  extension:
-    needs: get-extension-matrix
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix: ${{fromJson(needs.get-extension-matrix.outputs.matrix)}}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+
       - name: Build the extension
         uses: ./extension
         with:
@@ -126,6 +125,7 @@ jobs:
           auto-detect-args: true
           auto-detect-libs: true
           no-debug-symbols-ddtrace: true
+
       - name: Upload to release immediately
         shell: pwsh
         env:
@@ -135,7 +135,6 @@ jobs:
           $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
           $extension = $extensionOriginal
 
-          # Replace extension names for release
           switch ($extensionOriginal) {
             "base58-php-ext" { $extension = "base58" }
             "dd-trace-php" { $extension = "ddtrace" }
@@ -160,31 +159,26 @@ jobs:
             { $_ -in @("8.4", "8.5") } { "vs17" }
             default { "vs16" }
           }
-          
-          # Artifact name uses original extension name and ref with 'v'
+
           $artifactName = "php_${extensionOriginal}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
           $artifactNameModern = "php_${extension}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
-          
-          # Release uses new extension name and ref without 'v'
+
           $releaseTag = "${extension}-${refClean}"
           $releaseAssetName = "php_${extension}-${refClean}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
-          
-          # Найти собранный ZIP файл с оригинальным или современным именем
+
           $searchPaths = @(".", "C:\b", ".\artifacts", ".\build")
           $builtFile = $null
           $finalName = $artifactName
-          
+
           foreach ($searchPath in $searchPaths) {
             if (Test-Path $searchPath) {
-              # Ищем файл с оригинальным именем
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactName -File -ErrorAction SilentlyContinue | Select-Object -First 1
               if ($foundFile) {
                 $builtFile = $foundFile.FullName
                 $finalName = $artifactName
                 break
               }
-              
-              # Ищем файл с современным именем
+
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactNameModern -File -ErrorAction SilentlyContinue | Select-Object -First 1
               if ($foundFile) {
                 $builtFile = $foundFile.FullName
@@ -193,37 +187,30 @@ jobs:
               }
             }
           }
-          
+
           if ($builtFile -and (Test-Path $builtFile)) {
             Write-Host "Found built file: $builtFile"
-            
-            # Rename the artifact file to the new naming scheme if needed
+
             if ($finalName -ne $releaseAssetName) {
               Copy-Item $builtFile $releaseAssetName
             } else {
               $releaseAssetName = $builtFile
             }
 
-            # Repack the archive
             $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
             New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
             try {
               Write-Host "Extracting and repacking archive: $releaseAssetName"
 
-              # Extract archive to temporary directory
               Expand-Archive -Path $releaseAssetName -DestinationPath $tempDir -Force
-
-              # Remove original archive
               Remove-Item $releaseAssetName -Force
 
-              # Create subdirectories
               $extDir = Join-Path $tempDir "ext"
               $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
               New-Item -ItemType Directory -Path $extDir -Force | Out-Null
               New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
 
-              # Step 4: Move main extension DLL to ext folder
               $rootDll = Join-Path $tempDir "php_${extension}.dll"
               if (Test-Path $rootDll) {
                 $destPath = Join-Path $extDir "php_${extension}.dll"
@@ -231,10 +218,8 @@ jobs:
                 Write-Host "Moved php_${extension}.dll to ext folder"
               }
 
-              # Step 5: Process bin folder
               $binDir = Join-Path $tempDir "bin"
               if (Test-Path $binDir) {
-                # Move sasl2\plugin_sasldb.dll from bin to root as sasl2\plugin_sasldb.dll
                 $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
                 if (Test-Path $saslPlugin) {
                   $sasl2Dir = Join-Path $tempDir "sasl2"
@@ -250,11 +235,9 @@ jobs:
                 Write-Host "Removed bin folder"
               }
 
-              # Step 6: Remove *.lib and *.pdb files recursively
               Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
               Write-Host "Removed *.lib and *.pdb files"
 
-              # Step 7: Move all files and folders to 3rd-party\$extension
               Get-ChildItem -Path $tempDir | Where-Object {
                 $_.Name -ne 'ext' -and
                 $_.Name -ne '3rd-party' -and
@@ -270,20 +253,17 @@ jobs:
                   Write-Host "Moved $($_.Name) to 3rd-party\$extension"
               }
 
-              # Step 8: Create new archive
               Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
 
             } finally {
-              # Clean up temporary directory
               if (Test-Path $tempDir) {
                 Remove-Item $tempDir -Recurse -Force
               }
             }
-            
+
             Write-Host "Uploading $releaseAssetName to release $releaseTag"
             gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
 
-            # Cleanup artifacts for this run immediately after successful upload
             Write-Host "=== Deleting artifacts after successful release upload ==="
             try {
               $runId = "${{ github.run_id }}"
@@ -329,8 +309,7 @@ jobs:
 
           extension_url="${{ inputs.extension-url }}"
           extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-          
-          # Replace extension names
+
           case "$extension" in
             "base58-php-ext") extension="base58" ;;
             "dd-trace-php") extension="ddtrace" ;;
@@ -342,9 +321,8 @@ jobs:
             "pecl-database-pdo_oci") extension="pdo_oci" ;;
             "pecl-text-ssdeep") extension="ssdeep" ;;
           esac
-          
+
           ref="${{ inputs.extension-ref }}"
-          # Remove 'v' prefix from version for release
           ref_clean=$(echo "$ref" | sed 's/^v//')
           release_tag="${extension}-${ref_clean}"
 
@@ -364,7 +342,7 @@ jobs:
           echo "=== Checking if release $release_tag exists ==="
           if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
             echo "Release $release_tag exists, proceeding with cleanup"
-            
+
             echo "=== Deleting all assets from release $release_tag ==="
             assets=$(gh release view "$release_tag" -R ${{ github.repository }} --json assets --jq '.assets[].name' 2>/dev/null || echo "")
             if [ -n "$assets" ]; then
