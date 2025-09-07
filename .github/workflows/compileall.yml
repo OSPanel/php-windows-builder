@@ -138,9 +138,11 @@ jobs:
                     return 1
                 fi
 
-                echo ""
-                # Rate limiting
-                sleep 2
+                # Rate limiting between workflow triggers for same extension
+                if [ $total_workflows -lt ${#ext_groups[@]} ]; then
+                    echo "⏱️ Rate limiting: waiting 3 seconds before next workflow trigger..."
+                    sleep 3
+                fi
             done
 
             if [ ${#invalid_versions[@]} -gt 0 ]; then
@@ -187,9 +189,12 @@ jobs:
         successfully_processed=()
         failed_extensions=()
         versions="7.2,7.3,7.4,8.0,8.1,8.2,8.3,8.4"
+        total_extensions=${#to_process[@]}
+        current_extension=0
 
         for extension in "${to_process[@]}"; do
-            echo "🔄 Processing extension: $extension"
+            ((current_extension++))
+            echo "🔄 Processing extension $current_extension/$total_extensions: $extension"
 
             if trigger_extension_workflow "$extension" "$versions"; then
                 successfully_processed+=("$extension")
@@ -199,8 +204,11 @@ jobs:
                 echo "❌ Error processing extension $extension"
             fi
 
-            # Rate limiting between extensions
-            sleep 3
+            # Rate limiting between different extensions (only if not the last extension)
+            if [ $current_extension -lt $total_extensions ]; then
+                echo "⏱️ Rate limiting: waiting 5 seconds before next extension..."
+                sleep 5
+            fi
         done
 
         echo "✅ Processing completed."
