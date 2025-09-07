@@ -41,6 +41,7 @@ jobs:
             local php_versions="$2"
 
             echo "🔍 Processing extension: $extension_name"
+            echo "🔧 Debug: Received PHP versions: $php_versions"
 
             # Check if matrix file exists
             if [ ! -f "extension/BuildPhpExtension/config/matrix.json" ]; then
@@ -62,6 +63,8 @@ jobs:
             declare -A ext_groups
             invalid_versions=()
 
+            echo "🔧 Debug: Parsed PHP versions array: ${php_version_list[*]}"
+
             for php_version in "${php_version_list[@]}"; do
                 php_version=$(echo "$php_version" | xargs)
                 echo "🔍 Processing PHP version: $php_version"
@@ -74,7 +77,7 @@ jobs:
                 else
                     echo "✅ PHP $php_version - extension version: $ext_version"
 
-                    if [ -z "${ext_groups[$ext_version]:-}" ]; then
+                    if [ -z "${ext_groups[$ext_version]+_}" ]; then
                         ext_groups[$ext_version]="$php_version"
                     else
                         ext_groups[$ext_version]="${ext_groups[$ext_version]},$php_version"
@@ -223,6 +226,12 @@ jobs:
 
         echo "🔧 Debug: Starting extension processing loop..."
 
+        # Опционально: проверить содержимое массива с индексами и безопасным выводом
+        echo "🔧 Debug: Verifying extensions list (index=value):"
+        for i in "${!to_process[@]}"; do
+          printf '[%d]=%q\n' "$i" "${to_process[$i]}"
+        done
+
         # Process extensions
         successfully_processed=()
         failed_extensions=()
@@ -232,14 +241,20 @@ jobs:
 
         for extension in "${to_process[@]}"; do
             ((current_extension++))
-            echo "🔄 Processing extension $current_extension/$total_extensions: $extension"
+            printf '🔄 Processing extension %d/%d: %s\n' "$current_extension" "$total_extensions" "$extension"
 
-            if trigger_extension_workflow "$extension" "$versions"; then
+            # Важное изменение: не даём set -e оборвать джоб из-за сбоя внутри функции
+            set +e
+            trigger_extension_workflow "$extension" "$versions"
+            rc=$?
+            set -e
+
+            if [ $rc -eq 0 ]; then
                 successfully_processed+=("$extension")
                 echo "✅ Extension $extension processed successfully"
             else
                 failed_extensions+=("$extension")
-                echo "❌ Error processing extension $extension"
+                echo "❌ Error processing extension $extension (rc=$rc)"
                 # Continue processing other extensions instead of failing completely
             fi
 
