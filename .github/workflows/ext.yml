@@ -247,9 +247,12 @@ jobs:
         run: |
           $ErrorActionPreference = 'Continue'
           $target = "${{ steps.toolset.outputs.target }}"
+          $phpVersion = "${{ matrix.php }}"
+          $tsMode = "${{ matrix.ts }}".ToUpper()
 
           Write-Host "📥 Starting download process..." -ForegroundColor Cyan
           Write-Host "📁 Target directory: $target" -ForegroundColor Gray
+          Write-Host "🔧 Configuration: PHP $phpVersion ($tsMode)" -ForegroundColor Gray
 
           $planJson = '${{ steps.plan.outputs.plan }}'
           $plan = $planJson | ConvertFrom-Json
@@ -263,7 +266,7 @@ jobs:
           $failedCount = 0
           $failedExtensions = @()
 
-          Write-Host "🎯 Found $totalExtensions extensions to download" -ForegroundColor Cyan
+          Write-Host "🎯 Found $totalExtensions extensions to download for PHP $phpVersion ($tsMode)" -ForegroundColor Cyan
           Write-Host ""
 
           $counter = 0
@@ -273,14 +276,14 @@ jobs:
             $file = Join-Path $target $item.file
             $extName = $item.display_name
 
-            Write-Host "📦 [$counter/$totalExtensions] Downloading: $extName" -ForegroundColor Yellow
+            Write-Host "📦 [$counter/$totalExtensions] Downloading: $extName (PHP $phpVersion $tsMode)" -ForegroundColor Yellow
 
             try {
               # Check URL availability first
               $response = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
               if ($response.StatusCode -eq 200) {
                 Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
-                Write-Host "✅ Success: $extName downloaded" -ForegroundColor Green
+                Write-Host "✅ Success: $extName downloaded successfully" -ForegroundColor Green
                 $downloadedCount++
               }
             } catch {
@@ -288,52 +291,58 @@ jobs:
               if ($_.Exception.Response) {
                 $statusCode = " (Status: $($_.Exception.Response.StatusCode.value__))"
               }
-              Write-Host "❌ Failed: $extName$statusCode" -ForegroundColor Red
+              Write-Host "❌ Failed: $extName (PHP $phpVersion $tsMode)$statusCode" -ForegroundColor Red
               Write-Host "🔗 URL: $url" -ForegroundColor DarkGray
-              $failedExtensions += "$extName$statusCode"
+              $failedExtensions += "$extName (PHP $phpVersion $tsMode)$statusCode"
               $failedCount++
+
+              # Continue processing other extensions - don't break the loop
+              continue
             }
           }
 
           Write-Host ""
-          Write-Host "📊 Download Summary" -ForegroundColor Cyan
-          Write-Host "==================" -ForegroundColor Cyan
+          Write-Host "📊 Download Summary for PHP $phpVersion ($tsMode)" -ForegroundColor Cyan
+          Write-Host "===========================================" -ForegroundColor Cyan
           Write-Host "✅ Successful: $downloadedCount extensions" -ForegroundColor Green
           Write-Host "❌ Failed: $failedCount extensions" -ForegroundColor $(if ($failedCount -gt 0) { 'Red' } else { 'Green' })
 
           if ($failedExtensions.Count -gt 0) {
-            Write-Host "💥 Failed extensions:" -ForegroundColor Red
+            Write-Host "💥 Failed extensions for PHP $phpVersion ($tsMode):" -ForegroundColor Red
             foreach ($failed in $failedExtensions) {
               Write-Host "   - $failed" -ForegroundColor Red
             }
           }
 
-          # Ensure at least some extensions were downloaded
+          # Only fail if NO extensions were downloaded at all
           if ($downloadedCount -eq 0) {
-            Write-Host "💥 Critical: No extensions downloaded successfully!" -ForegroundColor Red
-            throw "Download process failed completely"
+            Write-Host "💥 Critical: No extensions downloaded successfully for PHP $phpVersion ($tsMode)!" -ForegroundColor Red
+            Write-Host "🔄 Note: Other PHP/TS combinations will still be processed" -ForegroundColor Yellow
+            throw "Download process failed completely for this configuration"
           }
 
           Write-Host ""
-          Write-Host "🚀 Proceeding with $downloadedCount available extensions..." -ForegroundColor Green
+          Write-Host "🚀 Proceeding with $downloadedCount available extensions for PHP $phpVersion ($tsMode)..." -ForegroundColor Green
 
       - name: 📂 Extract archives and cleanup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $target = "${{ steps.toolset.outputs.target }}"
+          $phpVersion = "${{ matrix.php }}"
+          $tsMode = "${{ matrix.ts }}".ToUpper()
 
-          Write-Host "📂 Extracting downloaded archives..." -ForegroundColor Cyan
+          Write-Host "📂 Extracting downloaded archives for PHP $phpVersion ($tsMode)..." -ForegroundColor Cyan
 
           $zipFiles = Get-ChildItem -Path $target -Filter *.zip
           $zipCount = $zipFiles.Count
 
           if ($zipCount -eq 0) {
-            Write-Host "❌ No ZIP files found to extract" -ForegroundColor Red
+            Write-Host "❌ No ZIP files found to extract for PHP $phpVersion ($tsMode)" -ForegroundColor Red
             throw "No archives to extract"
           }
 
-          Write-Host "🎯 Found $zipCount archives to extract" -ForegroundColor Yellow
+          Write-Host "🎯 Found $zipCount archives to extract for PHP $phpVersion ($tsMode)" -ForegroundColor Yellow
 
           $counter = 0
           $zipFiles | ForEach-Object {
@@ -345,9 +354,9 @@ jobs:
           }
 
           Write-Host ""
-          Write-Host "🧹 Cleaning up ZIP files..." -ForegroundColor Cyan
+          Write-Host "🧹 Cleaning up ZIP files for PHP $phpVersion ($tsMode)..." -ForegroundColor Cyan
           Get-ChildItem -Path $target -Filter *.zip | Remove-Item -Force
-          Write-Host "✅ Cleanup completed" -ForegroundColor Green
+          Write-Host "✅ Cleanup completed for PHP $phpVersion ($tsMode)" -ForegroundColor Green
 
       - name: 📦 Pack final result
         id: pack
@@ -359,7 +368,7 @@ jobs:
           $tool = "${{ steps.toolset.outputs.tool }}"
           $target = "${{ steps.toolset.outputs.target }}"
 
-          Write-Host "📦 Creating final extension pack..." -ForegroundColor Cyan
+          Write-Host "📦 Creating final extension pack for PHP $php ($($ts.ToUpper()))..." -ForegroundColor Cyan
 
           # Generate archive name: php-ext-pack-<php>-<ts>-Win32-<tool>-x64.zip
           $zipName = "php-ext-pack-$php-$ts-Win32-$tool-x64.zip"
@@ -374,7 +383,7 @@ jobs:
           Compress-Archive -Path (Join-Path $target '*') -DestinationPath $zipName
 
           $archiveSize = [math]::Round((Get-Item $zipName).Length / 1MB, 2)
-          Write-Host "✅ Archive created successfully ($archiveSize MB)" -ForegroundColor Green
+          Write-Host "✅ Archive created successfully: $zipName ($archiveSize MB)" -ForegroundColor Green
 
           Write-Output "zip=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
