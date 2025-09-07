@@ -43,7 +43,7 @@ jobs:
               | map(.value.ver | keys[])
               | unique
               | .[]
-            ' matrix.json
+            ' extension/BuildPhpExtension/config/matrix.json
           )
 
           if [[ -n "$PHP_VERSIONS_INPUT" ]]; then
@@ -144,7 +144,7 @@ jobs:
               })
             | map(select(.ver != ""))[]
             | @json
-          ' matrix.json)
+          ' extension/BuildPhpExtension/config/matrix.json)
 
           PLAN_JSON='[]'
           while IFS= read -r row; do
