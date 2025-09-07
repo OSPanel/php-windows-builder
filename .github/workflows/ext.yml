@@ -733,7 +733,6 @@ jobs:
           - Support for multiple PHP versions (7.x, 8.x)
           - Both Thread Safe (TS) and Non-Thread Safe (NTS) variants
           - Compiled with appropriate Visual Studio toolsets
-          - Additional extensions: Blackfire, Ioncube (NTS only), Firebird client
 
           ⚡ **Quick Installation:**
           1. Download the appropriate pack for your PHP version and thread safety mode
