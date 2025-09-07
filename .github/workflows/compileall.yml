@@ -31,12 +31,9 @@ jobs:
         export LC_ALL=C.UTF-8
         export LANG=C.UTF-8
 
-        # Режимы отладки и остановки по ошибке
+        # Включаем отладочный вывод и строгий режим до цикла
         set -e
         set -x
-
-        # Трап, чтобы увидеть место падения, если случится
-        trap 'rc=$?; echo "❌ Trap: error code $rc at line $LINENO"; exit $rc' ERR
 
         echo "🔧 Debug: Starting script execution"
         echo "🔧 Debug: MAX_COUNT=$MAX_COUNT"
@@ -232,44 +229,41 @@ jobs:
 
         echo "🔧 Debug: Starting extension processing loop..."
 
-        # Убираем потенциально проблемный printf-диагноз; при необходимости можно включить позже
-        # for i in "${!to_process[@]}"; do
-        #   printf '[%d]=%q\n' "$i" "${to_process[$i]}"
-        # done
-
-        # Обрабатываем расширения
+        # Подготовка переменных
         successfully_processed=()
         failed_extensions=()
         versions="7.2,7.3,7.4,8.0,8.1,8.2,8.3,8.4"
         total_extensions=${#to_process[@]}
         current_extension=0
 
-        for extension in "${to_process[@]}"; do
-            ((current_extension++))
-            # Используем echo для надёжности
-            echo "🔄 Processing extension $current_extension/$total_extensions: $extension"
+        # ВАЖНО: отключаем строгий режим на время цикла,
+        # чтобы ни один сбой внутри итерации не обрывал весь шаг.
+        set +e
 
-            # Локально отключаем set -e вокруг вызова функции
-            set +e
+        for extension in "${to_process[@]}"; do
+            ((current_extension++)) || true
+            echo "🔄 Processing extension $current_extension/$total_extensions: $extension" || true
+
             trigger_extension_workflow "$extension" "$versions"
             rc=$?
-            set -e
 
             if [ $rc -eq 0 ]; then
                 successfully_processed+=("$extension")
-                echo "✅ Extension $extension processed successfully"
+                echo "✅ Extension $extension processed successfully" || true
             else
                 failed_extensions+=("$extension")
-                echo "❌ Error processing extension $extension (rc=$rc)"
-                # Продолжаем дальше
+                echo "❌ Error processing extension $extension (rc=$rc)" || true
             fi
 
             # Пауза между разными расширениями
             if [ $current_extension -lt $total_extensions ]; then
-                echo "⏱️ Rate limiting: waiting 5 seconds before next extension..."
+                echo "⏱️ Rate limiting: waiting 5 seconds before next extension..." || true
                 sleep 5
             fi
         done
+
+        # Возвращаем строгий режим для завершающих проверок
+        set -e
 
         echo "✅ Processing completed."
         echo "📊 Successfully processed: ${#successfully_processed[@]}"
