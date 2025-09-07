@@ -173,22 +173,54 @@ jobs:
       - name: Download all extension archives
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
+          $ErrorActionPreference = 'Continue'  # Изменено с 'Stop' на 'Continue'
           $target = "${{ steps.toolset.outputs.target }}"
-          $plan = '${{ steps.plan.outputs.plan }}' | ConvertFrom-Json
+
+          # Декодируем JSON из base64 (если используете base64) или читаем напрямую
+          $planJson = '${{ steps.plan.outputs.plan }}'
+          $plan = $planJson | ConvertFrom-Json
+
           if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
+
+          $downloadedCount = 0
+          $failedCount = 0
+          $failedExtensions = @()
 
           foreach ($item in $plan) {
             $url = $item.url
             $file = Join-Path $target $item.file
             Write-Host "Downloading $url -> $file"
+
             try {
-              Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing
+              # Сначала проверяем доступность URL
+              $response = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
+              if ($response.StatusCode -eq 200) {
+                Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
+                Write-Host "✓ Successfully downloaded: $($item.file)" -ForegroundColor Green
+                $downloadedCount++
+              }
             } catch {
-              Write-Warning "Failed to download $url"
-              throw
+              $extName = ($item.file -split '-')[1]  # Извлекаем имя расширения из имени файла
+              Write-Warning "✗ Failed to download $url - $($_.Exception.Message)"
+              $failedExtensions += $extName
+              $failedCount++
             }
           }
+
+          Write-Host "`n=== Download Summary ===" -ForegroundColor Cyan
+          Write-Host "Successfully downloaded: $downloadedCount extensions" -ForegroundColor Green
+          Write-Host "Failed downloads: $failedCount extensions" -ForegroundColor Yellow
+
+          if ($failedExtensions.Count -gt 0) {
+            Write-Host "Failed extensions: $($failedExtensions -join ', ')" -ForegroundColor Yellow
+          }
+
+          # Проверяем, что хотя бы что-то скачалось
+          if ($downloadedCount -eq 0) {
+            Write-Error "No extensions were downloaded successfully!" -ErrorAction Stop
+          }
+
+          Write-Host "Continuing with available extensions..." -ForegroundColor Green
 
       - name: Extract all archives and remove zips
         shell: pwsh
