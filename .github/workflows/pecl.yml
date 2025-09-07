@@ -1,5 +1,6 @@
 name: Build PHP Extension From PECL
 run-name: Build PHP Extension ${{ inputs.extension-url }}, ${{ inputs.extension-ref }}
+
 on:
   workflow_dispatch:
     inputs:
@@ -47,8 +48,93 @@ on:
   repository_dispatch:
     types: [build_extension]
 
+permissions:
+  contents: write
+
 jobs:
+  # 1) Подготовка: сериализованно создаём git-тег (аннотированный) и релиз,
+  #    чтобы он был Verified, и чтобы не было гонок с матрицей.
+  prepare-release:
+    runs-on: ubuntu-latest
+    concurrency:
+      group: prepare-${{ inputs.extension-url }}-${{ inputs.extension-ref }}
+      cancel-in-progress: false
+    outputs:
+      tag: ${{ steps.out.outputs.tag }}
+      extension: ${{ steps.out.outputs.extension }}
+      ref_clean: ${{ steps.out.outputs.ref_clean }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Compute names, ensure tag on origin, ensure release
+        id: prep
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          extension_url="${{ inputs.extension-url }}"
+          extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
+
+          # Нормализуем имя расширения (как в ваших шагах)
+          case "$extension" in
+            "base58-php-ext") extension="base58" ;;
+            "dd-trace-php") extension="ddtrace" ;;
+            "msgpack-php") extension="msgpack" ;;
+            "php-firebird") extension="interbase" ;;
+            "php-ext-lz4") extension="lz4" ;;
+            "php-memcached") extension="memcached" ;;
+            "pecl-database-oci8") extension="oci8_19" ;;
+            "pecl-database-pdo_oci") extension="pdo_oci" ;;
+            "pecl-text-ssdeep") extension="ssdeep" ;;
+          esac
+
+          ref="${{ inputs.extension-ref }}"
+          ref_clean="$(echo "$ref" | sed 's/^v//')"
+          tag="${extension}-${ref_clean}"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git fetch --tags --force
+
+          if git ls-remote --tags origin | grep -qE "refs/tags/${tag}$"; then
+            echo "Remote already has tag $tag"
+            git fetch origin "refs/tags/$tag:refs/tags/$tag" || true
+          else
+            if ! git rev-parse -q --verify "refs/tags/$tag" >/dev/null 2>&1; then
+              git tag -a "$tag" -m "$tag"
+              echo "Created annotated tag $tag"
+            fi
+            if ! git push origin "refs/tags/$tag"; then
+              echo "Push failed (race possible). Fetch tag from origin."
+              git fetch origin "refs/tags/$tag:refs/tags/$tag" || true
+            fi
+          fi
+
+          if ! gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            gh release create "${tag}" \
+              -t "${extension} ${ref_clean}" \
+              -n "Release of PECL extension '${extension}' version ${ref_clean}" \
+              -R ${{ github.repository }}
+          fi
+
+          echo "extension=$extension" >> "$GITHUB_OUTPUT"
+          echo "ref_clean=$ref_clean" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Expose outputs
+        id: out
+        run: |
+          echo "extension=${{ steps.prep.outputs.extension }}" >> "$GITHUB_OUTPUT"
+          echo "ref_clean=${{ steps.prep.outputs.ref_clean }}" >> "$GITHUB_OUTPUT"
+          echo "tag=${{ steps.prep.outputs.tag }}" >> "$GITHUB_OUTPUT"
+
+  # 2) Генерация матрицы после того, как тег и релиз уже существуют.
   get-extension-matrix:
+    needs: prepare-release
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.extension-matrix.outputs.matrix }}
@@ -65,8 +151,9 @@ jobs:
           arch-list: ${{ inputs.arch-list }}
           ts-list: ${{ inputs.ts-list }}
 
+  # 3) Сборка и немедленная загрузка ассетов в уже подготовленный релиз.
   extension:
-    needs: get-extension-matrix
+    needs: [prepare-release, get-extension-matrix]
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -74,64 +161,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-
-      - name: Ensure git tag exists and create release if needed
-        shell: bash
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          extension_url="${{ inputs.extension-url }}"
-          extension="$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')"
-          # Replace some repository names with extension names used in releases
-          case "$extension" in
-            "base58-php-ext") extension="base58" ;;
-            "dd-trace-php") extension="ddtrace" ;;
-            "msgpack-php") extension="msgpack" ;;
-            "php-firebird") extension="interbase" ;;
-            "php-ext-lz4") extension="lz4" ;;
-            "php-memcached") extension="memcached" ;;
-            "pecl-database-oci8") extension="oci8_19" ;;
-            "pecl-database-pdo_oci") extension="pdo_oci" ;;
-            "pecl-text-ssdeep") extension="ssdeep" ;;
-          esac
-
-          ref="${{ inputs.extension-ref }}"
-          # Strip 'v' prefix from version for the release tag
-          ref_clean="$(echo "$ref" | sed 's/^v//')"
-          tag="${extension}-${ref_clean}"
-
-          # Configure git identity for tagging
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-
-          # Make sure tags are up to date
-          git fetch --tags --force
-
-          # Create annotated tag locally if missing
-          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
-            echo "Git tag $tag already exists locally."
-          else
-            git tag -a "$tag" -m "$tag"
-            echo "Created annotated tag $tag"
-          fi
-
-          # Push tag to origin if not present there
-          if git ls-remote --tags origin | grep -q "refs/tags/$tag$"; then
-            echo "Git tag $tag already exists on origin."
-          else
-            git push origin "refs/tags/$tag"
-            echo "Pushed tag $tag to origin."
-          fi
-
-          # Create release if it does not exist yet (now tied to a real git tag -> Verified)
-          if ! gh release view "${tag}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            gh release create "${tag}" \
-              -t "${extension} ${ref_clean}" \
-              -n "Release of PECL extension '${extension}' version ${ref_clean}" \
-              -R ${{ github.repository }}
-          fi
 
       - name: Build the extension
         uses: ./extension
@@ -158,14 +187,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Make non-terminating errors terminate the step to avoid silent failures
           $ErrorActionPreference = "Stop"
 
           $extensionUrl = "${{ inputs.extension-url }}"
           $extensionOriginal = (Split-Path $extensionUrl -Leaf).ToLower()
           $extension = $extensionOriginal
 
-          # Normalize extension name for release asset naming
           switch ($extensionOriginal) {
             "base58-php-ext" { $extension = "base58" }
             "dd-trace-php" { $extension = "ddtrace" }
@@ -183,8 +210,8 @@ jobs:
           $ts = "${{ matrix.ts }}"
           $ref = "${{ inputs.extension-ref }}"
           $refClean = $ref -replace '^v', ''
+          $releaseTag = "${{ needs.prepare-release.outputs.tag }}"
 
-          # Derive Visual Studio toolset identifier from PHP version
           $vsVersion = switch ($phpVersion) {
             { $_ -in @("7.2", "7.3", "7.4") } { "vc15" }
             { $_ -in @("8.0", "8.1", "8.2", "8.3") } { "vs16" }
@@ -192,25 +219,18 @@ jobs:
             default { "vs16" }
           }
 
-          # Possible artifact file names produced by the build
           $artifactName = "php_${extensionOriginal}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
           $artifactNameModern = "php_${extension}-${ref}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
-
-          # Final asset name in the release
-          $releaseTag = "${extension}-${refClean}"
           $releaseAssetName = "php_${extension}-${refClean}-${phpVersion}-${ts}-${vsVersion}-${arch}.zip"
 
-          # Search for the built file in common locations
           $searchPaths = @(".", "C:\b", ".\artifacts", ".\build")
           $builtFile = $null
           $finalName = $artifactName
 
           foreach ($searchPath in $searchPaths) {
             if (Test-Path $searchPath) {
-              # Try legacy artifact name
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactName -File -ErrorAction SilentlyContinue | Select-Object -First 1
               if ($foundFile) { $builtFile = $foundFile.FullName; $finalName = $artifactName; break }
-              # Try modern artifact name
               $foundFile = Get-ChildItem -Path $searchPath -Filter $artifactNameModern -File -ErrorAction SilentlyContinue | Select-Object -First 1
               if ($foundFile) { $builtFile = $foundFile.FullName; $finalName = $artifactNameModern; break }
             }
@@ -225,7 +245,6 @@ jobs:
 
           Write-Host "Found built file: $builtFile"
 
-          # Ensure the file name matches the intended release asset name
           if ($finalName -ne $releaseAssetName) {
             Copy-Item $builtFile $releaseAssetName -Force
             $artifactPathToUpload = (Resolve-Path $releaseAssetName).Path
@@ -233,7 +252,6 @@ jobs:
             $artifactPathToUpload = $builtFile
           }
 
-          # Repack the archive into a normalized structure
           $tempDir = Join-Path $env:TEMP "repack_$(Get-Random)"
           New-Item -ItemType Directory -Path $tempDir -Force | Out-Null
 
@@ -242,22 +260,18 @@ jobs:
             Expand-Archive -Path $artifactPathToUpload -DestinationPath $tempDir -Force
             Remove-Item $artifactPathToUpload -Force
 
-            # Create target directories
             $extDir = Join-Path $tempDir "ext"
             $thirdPartyDir = Join-Path $tempDir "3rd-party\$extension"
             New-Item -ItemType Directory -Path $extDir -Force | Out-Null
             New-Item -ItemType Directory -Path $thirdPartyDir -Force | Out-Null
 
-            # Move main extension DLL into ext/
             $rootDll = Join-Path $tempDir "php_${extension}.dll"
             if (Test-Path $rootDll) {
               Move-Item $rootDll (Join-Path $extDir "php_${extension}.dll") -Force
             }
 
-            # Process bin/ folder: keep only required items and remove the folder
             $binDir = Join-Path $tempDir "bin"
             if (Test-Path $binDir) {
-              # Move sasl2\plugin_sasldb.dll to top-level sasl2\ if present
               $saslPlugin = Join-Path $binDir "sasl2\plugin_sasldb.dll"
               if (Test-Path $saslPlugin) {
                 $sasl2Dir = Join-Path $tempDir "sasl2"
@@ -269,10 +283,8 @@ jobs:
               Remove-Item $binDir -Recurse -Force
             }
 
-            # Drop *.lib and *.pdb debug/import files
             Get-ChildItem -Path $tempDir -Include @("*.lib", "*.pdb") -Recurse | Remove-Item -Force
 
-            # Move everything except dlls/ext/3rd-party/sasl2 (and Imagick config) into 3rd-party/<ext>/
             Get-ChildItem -Path $tempDir | Where-Object {
               $_.Name -ne 'ext' -and
               $_.Name -ne '3rd-party' -and
@@ -283,7 +295,6 @@ jobs:
               Move-Item -Path $_.FullName -Destination (Join-Path $thirdPartyDir $_.Name) -Force
             }
 
-            # Pack the normalized folder structure into the final asset
             Compress-Archive -Path "$tempDir\*" -DestinationPath $releaseAssetName -Force
           }
           finally {
@@ -293,16 +304,11 @@ jobs:
           Write-Host "Uploading $releaseAssetName to release $releaseTag"
           gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
 
-          # Targeted cleanup: delete only artifacts of this job that correspond to the uploaded asset
           Write-Host "=== Deleting only related artifacts after successful release upload ==="
           try {
             $runId = "${{ github.run_id }}"
             $repo = "${{ github.repository }}"
-
-            # Candidate artifact names that might have been uploaded by this job
             $candidateNames = @($artifactName, $artifactNameModern, $releaseAssetName) | Where-Object { $_ -and $_.Trim() -ne "" } | Select-Object -Unique
-
-            # Fetch artifacts of this run (id and name) and delete only matching ones
             $artifacts = gh api "repos/$repo/actions/runs/$runId/artifacts" --jq '.artifacts[] | {id: .id, name: .name}' 2>$null | ConvertFrom-Json -ErrorAction SilentlyContinue
             if ($null -eq $artifacts) {
               Write-Host "No artifacts data returned for this run"
@@ -318,10 +324,11 @@ jobs:
             Write-Warning "Artifacts cleanup failed: $($_.Exception.Message)"
           }
 
+  # 4) Уборка релиза/тега при сбое сборок.
   cleanup-release:
     runs-on: ubuntu-latest
     if: failure()
-    needs: [get-extension-matrix, extension]
+    needs: [prepare-release, get-extension-matrix, extension]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -336,27 +343,7 @@ jobs:
         run: |
           set -e
 
-          extension_url="${{ inputs.extension-url }}"
-          extension=$(basename "$extension_url" | tr '[:upper:]' '[:lower:]')
-
-          # Replace some repository names with extension names used in releases
-          case "$extension" in
-            "base58-php-ext") extension="base58" ;;
-            "dd-trace-php") extension="ddtrace" ;;
-            "msgpack-php") extension="msgpack" ;;
-            "php-firebird") extension="interbase" ;;
-            "php-ext-lz4") extension="lz4" ;;
-            "php-memcached") extension="memcached" ;;
-            "pecl-database-oci8") extension="oci8_19" ;;
-            "pecl-database-pdo_oci") extension="pdo_oci" ;;
-            "pecl-text-ssdeep") extension="ssdeep" ;;
-          esac
-
-          ref="${{ inputs.extension-ref }}"
-          # Strip 'v' prefix from version for the release tag
-          ref_clean=$(echo "$ref" | sed 's/^v//')
-          release_tag="${extension}-${ref_clean}"
-
+          release_tag="${{ needs.prepare-release.outputs.tag }}"
           echo "=== Starting cleanup for release: $release_tag ==="
 
           echo "=== Deleting all artifacts from this run ==="
@@ -392,7 +379,6 @@ jobs:
           fi
 
           echo "=== Deleting tag ref (force, covers unverified/virtual tags) ==="
-          # Remove the git ref for the tag via API; harmless if it doesn't exist
           gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
 
           echo "=== Cleanup completed successfully ==="
