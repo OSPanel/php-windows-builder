@@ -1,4 +1,4 @@
-name: Compile All Extensions
+name: Compile Extensions
 
 on:
   workflow_dispatch:
