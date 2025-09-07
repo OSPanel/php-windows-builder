@@ -1,5 +1,5 @@
-name: Build PHP Extensions Packs
-run-name: Build PHP Ext Packs ${{ inputs.php-versions || 'all-in-matrix' }}
+name: 🔧 Build PHP Extensions Packs
+run-name: 🚀 Build PHP Ext Packs ${{ inputs.php-versions || 'all-in-matrix' }}
 
 on:
   workflow_dispatch:
@@ -21,22 +21,26 @@ permissions:
 
 jobs:
   generate-matrix:
-    name: Generate matrix from matrix.json
+    name: 🎯 Generate Build Matrix
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.mk-matrix.outputs.matrix }}
     steps:
-      - name: Checkout
+      - name: 🛡️ Checkout repository
         uses: actions/checkout@v4
 
-      - id: mk-matrix
+      - name: 🧮 Generate matrix from matrix.json
+        id: mk-matrix
         shell: bash
         run: |
           set -euo pipefail
 
+          echo "🔍 Reading build configuration from matrix.json..."
+
           PHP_VERSIONS_INPUT="${{ inputs.php-versions || '' }}"
           TS_INPUT="${{ inputs.ts || 'ts,nts' }}"
 
+          # Extract all available PHP versions from matrix.json
           ALL_PHP_VERS=$(
             jq -r '
               to_entries
@@ -46,29 +50,38 @@ jobs:
             ' extension/BuildPhpExtension/config/matrix.json
           )
 
+          echo "📋 Available PHP versions in matrix: $(echo "$ALL_PHP_VERS" | tr '\n' ' ')"
+
+          # Process requested PHP versions
           if [[ -n "$PHP_VERSIONS_INPUT" ]]; then
+            echo "🎯 Using specified PHP versions: $PHP_VERSIONS_INPUT"
             IFS=',' read -ra REQ <<< "$PHP_VERSIONS_INPUT"
             PHP_VERS=()
             for v in "${REQ[@]}"; do
               v_trim=$(echo "$v" | xargs)
               if printf '%s\n' "${ALL_PHP_VERS[@]}" | grep -qx "$v_trim"; then
                 PHP_VERS+=("$v_trim")
+                echo "✅ PHP $v_trim - found in matrix"
               else
-                echo "Warning: PHP version $v_trim not found in matrix.json — skipped" >&2
+                echo "❌ PHP $v_trim - not found in matrix, skipping"
               fi
             done
           else
+            echo "🌐 Using all available PHP versions from matrix"
             readarray -t PHP_VERS <<< "$ALL_PHP_VERS"
           fi
 
           if [[ ${#PHP_VERS[@]} -eq 0 ]]; then
-            echo "No PHP versions found to build" >&2
+            echo "💥 No valid PHP versions found to build"
             exit 1
           fi
 
-          IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
+          echo "🔨 Final PHP versions to build: ${PHP_VERS[*]}"
 
-          # Use jq to properly construct JSON
+          IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
+          echo "⚙️ Thread safety modes: ${TS_VALUES[*]}"
+
+          # Build matrix using jq for proper JSON construction
           MATRIX_ITEMS=()
           for phpv in "${PHP_VERS[@]}"; do
             for ts in "${TS_VALUES[@]}"; do
@@ -82,10 +95,11 @@ jobs:
           ITEMS_STR="${ITEMS_STR%,}"  # Remove trailing comma
           MATRIX_JSON="{\"include\":[${ITEMS_STR}]}"
 
+          echo "📊 Generated matrix with ${#MATRIX_ITEMS[@]} combinations"
           echo "matrix=$MATRIX_JSON" >> "$GITHUB_OUTPUT"
 
   build-and-release:
-    name: Build + Release ${{ matrix.php }}-${{ matrix.ts }}
+    name: 🔧 Build ${{ matrix.php }}-${{ matrix.ts }}
     runs-on: windows-2022
     needs: generate-matrix
     if: ${{ always() }} # allow parallel independent releases
@@ -93,10 +107,10 @@ jobs:
       fail-fast: false
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Checkout
+      - name: 🛡️ Checkout repository
         uses: actions/checkout@v4
 
-      - name: Determine toolset and naming
+      - name: 🎯 Determine toolset and naming
         id: toolset
         shell: bash
         run: |
@@ -104,7 +118,9 @@ jobs:
           PHP="${{ matrix.php }}"
           TS="${{ matrix.ts }}"
 
-          # Compiler map:
+          echo "🔍 Determining compiler toolset for PHP $PHP..."
+
+          # Compiler mapping:
           # 7.x => vc15
           # 8.0–8.3 => vs16
           # 8.4–8.5 => vs17
@@ -114,24 +130,32 @@ jobs:
           tool=""
           if [[ "$major" == "7" ]]; then
             tool="vc15"
+            echo "🏗️ PHP 7.x detected - using Visual Studio 2017 (vc15)"
           else
             if [[ "$minor" -ge 4 ]]; then
               tool="vs17"
+              echo "🏗️ PHP 8.4+ detected - using Visual Studio 2022 (vs17)"
             else
               tool="vs16"
+              echo "🏗️ PHP 8.0-8.3 detected - using Visual Studio 2019 (vs16)"
             fi
           fi
 
           TARGET_DIR="php-${PHP}-${TS}"
+          echo "📁 Target directory: $TARGET_DIR"
+
           echo "tool=$tool" >> "$GITHUB_OUTPUT"
           echo "target=$TARGET_DIR" >> "$GITHUB_OUTPUT"
 
-      - name: Create target directory
+      - name: 📁 Create target directory
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Force -Path "${{ steps.toolset.outputs.target }}" | Out-Null
+          $target = "${{ steps.toolset.outputs.target }}"
+          Write-Host "📁 Creating target directory: $target"
+          New-Item -ItemType Directory -Force -Path $target | Out-Null
+          Write-Host "✅ Directory created successfully"
 
-      - name: Build download plan from matrix.json
+      - name: 📋 Build download plan from matrix.json
         id: plan
         shell: bash
         run: |
@@ -140,6 +164,9 @@ jobs:
           TS="${{ matrix.ts }}"
           TOOL="${{ steps.toolset.outputs.tool }}"
 
+          echo "📋 Building download plan for PHP $PHP ($TS, $TOOL)..."
+
+          # Extract extensions and versions for this PHP version
           DOWNLOADS=$(jq -r --arg php "$PHP" '
             to_entries
             | map({
@@ -150,12 +177,18 @@ jobs:
             | @json
           ' extension/BuildPhpExtension/config/matrix.json)
 
+          extension_count=$(echo "$DOWNLOADS" | wc -l)
+          echo "🔍 Found $extension_count extensions in matrix for PHP $PHP"
+
           PLAN_JSON='[]'
+          processed=0
           while IFS= read -r row; do
             if [[ -n "$row" ]]; then
               ext=$(echo "$row" | jq -r '.ext')
               ver=$(echo "$row" | jq -r '.ver')
+              original_ext="$ext"
 
+              # Normalize extension names (same logic as pecl.yml)
               case "$ext" in
                 "base58-php-ext") ext="base58" ;;
                 "dd-trace-php") ext="ddtrace" ;;
@@ -168,15 +201,26 @@ jobs:
                 "pecl-text-ssdeep") ext="ssdeep" ;;
               esac
 
+              # Clean version from 'v' prefix
               ver_clean=$(echo "$ver" | sed 's/^v//')
+
+              if [[ "$original_ext" != "$ext" ]]; then
+                echo "🔄 Normalized: $original_ext -> $ext"
+              fi
 
               tag="${ext}-${ver_clean}"
               file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
               url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
               PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
+
+              processed=$((processed + 1))
+              echo "📦 [$processed/$extension_count] Planned: $ext v$ver_clean"
             fi
           done <<< "$DOWNLOADS"
 
+          echo "✅ Download plan completed with $processed extensions"
+
+          # Save plan to output
           echo "$PLAN_JSON" > plan.json
           {
             echo "plan<<EOF"
@@ -184,67 +228,106 @@ jobs:
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
 
-      - name: Download all extension archives
+      - name: 📥 Download extension archives
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Continue'  # Изменено с 'Stop' на 'Continue'
+          $ErrorActionPreference = 'Continue'
           $target = "${{ steps.toolset.outputs.target }}"
+
+          Write-Host "📥 Starting download process..." -ForegroundColor Cyan
+          Write-Host "📁 Target directory: $target" -ForegroundColor Gray
 
           $planJson = '${{ steps.plan.outputs.plan }}'
           $plan = $planJson | ConvertFrom-Json
 
-          if (-not (Test-Path $target)) { New-Item -ItemType Directory -Path $target | Out-Null }
+          if (-not (Test-Path $target)) {
+            New-Item -ItemType Directory -Path $target | Out-Null
+          }
 
+          $totalExtensions = $plan.Count
           $downloadedCount = 0
           $failedCount = 0
           $failedExtensions = @()
 
+          Write-Host "🎯 Found $totalExtensions extensions to download" -ForegroundColor Cyan
+          Write-Host ""
+
+          $counter = 0
           foreach ($item in $plan) {
+            $counter++
             $url = $item.url
             $file = Join-Path $target $item.file
-            Write-Host "Downloading $url -> $file"
+            $extName = ($item.file -split '_')[1] -split '-' | Select-Object -First 1
+
+            Write-Host "📦 [$counter/$totalExtensions] Downloading: $extName" -ForegroundColor Yellow
 
             try {
+              # Check URL availability first
               $response = Invoke-WebRequest -Uri $url -Method Head -UseBasicParsing -ErrorAction Stop
               if ($response.StatusCode -eq 200) {
                 Invoke-WebRequest -Uri $url -OutFile $file -UseBasicParsing -ErrorAction Stop
-                Write-Host "✓ Successfully downloaded: $($item.file)" -ForegroundColor Green
+                Write-Host "✅ Success: $extName downloaded" -ForegroundColor Green
                 $downloadedCount++
               }
             } catch {
-              $extName = ($item.file -split '-')[1]  # Извлекаем имя расширения из имени файла
-              Write-Warning "✗ Failed to download $url - $($_.Exception.Message)"
+              Write-Host "❌ Failed: $extName - $($_.Exception.Message)" -ForegroundColor Red
               $failedExtensions += $extName
               $failedCount++
             }
           }
 
-          Write-Host "`n=== Download Summary ===" -ForegroundColor Cyan
-          Write-Host "Successfully downloaded: $downloadedCount extensions" -ForegroundColor Green
-          Write-Host "Failed downloads: $failedCount extensions" -ForegroundColor Yellow
+          Write-Host ""
+          Write-Host "📊 Download Summary" -ForegroundColor Cyan
+          Write-Host "==================" -ForegroundColor Cyan
+          Write-Host "✅ Successful: $downloadedCount extensions" -ForegroundColor Green
+          Write-Host "❌ Failed: $failedCount extensions" -ForegroundColor $(if ($failedCount -gt 0) { 'Red' } else { 'Green' })
 
           if ($failedExtensions.Count -gt 0) {
-            Write-Host "Failed extensions: $($failedExtensions -join ', ')" -ForegroundColor Yellow
+            Write-Host "💥 Failed extensions: $($failedExtensions -join ', ')" -ForegroundColor Red
           }
 
+          # Ensure at least some extensions were downloaded
           if ($downloadedCount -eq 0) {
-            Write-Error "No extensions were downloaded successfully!" -ErrorAction Stop
+            Write-Host "💥 Critical: No extensions downloaded successfully!" -ForegroundColor Red
+            throw "Download process failed completely"
           }
 
-          Write-Host "Continuing with available extensions..." -ForegroundColor Green
+          Write-Host ""
+          Write-Host "🚀 Proceeding with $downloadedCount available extensions..." -ForegroundColor Green
 
-      - name: Extract all archives and remove zips
+      - name: 📂 Extract archives and cleanup
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
           $target = "${{ steps.toolset.outputs.target }}"
-          Get-ChildItem -Path $target -Filter *.zip | ForEach-Object {
-            Write-Host "Unzip: $($_.FullName)"
-            Expand-Archive -LiteralPath $_.FullName -DestinationPath $target -Force
-          }
-          Get-ChildItem -Path $target -Filter *.zip | Remove-Item -Force
 
-      - name: Pack result
+          Write-Host "📂 Extracting downloaded archives..." -ForegroundColor Cyan
+
+          $zipFiles = Get-ChildItem -Path $target -Filter *.zip
+          $zipCount = $zipFiles.Count
+
+          if ($zipCount -eq 0) {
+            Write-Host "❌ No ZIP files found to extract" -ForegroundColor Red
+            throw "No archives to extract"
+          }
+
+          Write-Host "🎯 Found $zipCount archives to extract" -ForegroundColor Yellow
+
+          $counter = 0
+          $zipFiles | ForEach-Object {
+            $counter++
+            $zipName = $_.Name -replace '\.zip$', ''
+            Write-Host "📦 [$counter/$zipCount] Extracting: $zipName" -ForegroundColor Yellow
+            Expand-Archive -LiteralPath $_.FullName -DestinationPath $target -Force
+            Write-Host "✅ Extracted: $zipName" -ForegroundColor Green
+          }
+
+          Write-Host ""
+          Write-Host "🧹 Cleaning up ZIP files..." -ForegroundColor Cyan
+          Get-ChildItem -Path $target -Filter *.zip | Remove-Item -Force
+          Write-Host "✅ Cleanup completed" -ForegroundColor Green
+
+      - name: 📦 Pack final result
         id: pack
         shell: pwsh
         run: |
@@ -254,15 +337,26 @@ jobs:
           $tool = "${{ steps.toolset.outputs.tool }}"
           $target = "${{ steps.toolset.outputs.target }}"
 
-          # Archive name: php-ext-pack-<php>-<ts>-Win32-<tool>-x64.zip
-          $zipName = "php-ext-pack-$php-$ts-Win32-$tool-x64.zip"
+          Write-Host "📦 Creating final extension pack..." -ForegroundColor Cyan
 
-          if (Test-Path $zipName) { Remove-Item $zipName -Force }
+          # Generate archive name: php-ext-pack-<php>-<ts>-Win32-<tool>-x64.zip
+          $zipName = "php-ext-pack-$php-$ts-Win32-$tool-x64.zip"
+          Write-Host "📄 Archive name: $zipName" -ForegroundColor Yellow
+
+          if (Test-Path $zipName) {
+            Write-Host "🗑️ Removing existing archive..." -ForegroundColor Gray
+            Remove-Item $zipName -Force
+          }
+
+          Write-Host "🔨 Compressing extensions..." -ForegroundColor Yellow
           Compress-Archive -Path (Join-Path $target '*') -DestinationPath $zipName
+
+          $archiveSize = [math]::Round((Get-Item $zipName).Length / 1MB, 2)
+          Write-Host "✅ Archive created successfully ($archiveSize MB)" -ForegroundColor Green
 
           Write-Output "zip=$zipName" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-      - name: Upload single-file release
+      - name: 🚀 Upload to release
         if: ${{ inputs.upload == 'true' }}
         shell: bash
         env:
@@ -273,18 +367,54 @@ jobs:
           TS="${{ matrix.ts }}"
           ZIP="${{ steps.pack.outputs.zip }}"
 
-          # Release tag per pack: ext-pack-<MAJOR.MINOR>-<ts>
-          TAG="ext-pack-${PHP}-${TS}"
-          TITLE="Extensions Pack for PHP ${PHP} (${TS})"
-          BODY="PHP extensions pack built from matrix.json for PHP ${PHP} (${TS})."
+          echo "🚀 Preparing release upload..."
+          echo "📦 Archive: $ZIP"
 
-          # Create or update the release with a single artifact
+          # Generate release tag: ext-pack-<MAJOR.MINOR>-<ts>
+          TAG="ext-pack-${PHP}-${TS}"
+          TITLE="🔧 Extensions Pack for PHP ${PHP} (${TS})"
+          BODY="📦 PHP extensions pack built from matrix.json for PHP ${PHP} (${TS}) architecture.
+
+          🎯 **Target Configuration:**
+          - PHP Version: ${PHP}
+          - Thread Safety: ${TS}
+          - Architecture: x64
+          - Platform: Windows
+
+          ⚡ **Installation:**
+          Extract the archive contents to your PHP installation directory.
+
+          🤖 **Auto-generated** by GitHub Actions workflow."
+
+          echo "🏷️ Release tag: $TAG"
+
+          # Create or update release
           if ! gh release view "$TAG" -R "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "✨ Creating new release: $TAG"
             gh release create "$TAG" "$ZIP" \
               -t "$TITLE" \
               -n "$BODY" \
               -R "${{ github.repository }}"
+            echo "✅ Release created successfully"
           else
-            # Replace the asset if it exists
+            echo "🔄 Updating existing release: $TAG"
             gh release upload "$TAG" "$ZIP" --clobber -R "${{ github.repository }}"
+            echo "✅ Release updated successfully"
           fi
+
+          echo ""
+          echo "🎉 Upload completed successfully!"
+          echo "📊 Repository: ${{ github.repository }}"
+          echo "🏷️ Release: $TAG"
+          echo "📦 Archive: $ZIP"
+
+      - name: ✅ Build completed
+        if: success()
+        run: |
+          echo "🎉 Build completed successfully!"
+          echo "📊 Configuration: PHP ${{ matrix.php }} (${{ matrix.ts }})"
+          echo "🔧 Toolset: ${{ steps.toolset.outputs.tool }}"
+          echo "📦 Archive: ${{ steps.pack.outputs.zip }}"
+          echo "⏰ Completion time: $(date)"
+          echo ""
+          echo "🚀 Extension pack is ready for use!"
