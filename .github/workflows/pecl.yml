@@ -335,8 +335,12 @@ jobs:
               # Create comments dictionary
               Write-Host "Creating comments dictionary..."
               $commentMap = @{}
-              foreach ($comment in $matrixComments) {
-                $commentMap[$comment.parameter] = $comment.comment
+              if ($matrixComments -and $matrixComments.Count -gt 0) {
+                foreach ($comment in $matrixComments) {
+                  if ($comment -and $comment.parameter -and $comment.comment) {
+                    $commentMap[$comment.parameter] = $comment.comment
+                  }
+                }
               }
               Write-Host "Comments dictionary created with $($commentMap.Count) entries"
               
@@ -345,7 +349,7 @@ jobs:
               $extensionData = $matrixIni | Where-Object { $_.extension -eq $extension }
               Write-Host "Found $($extensionData.Count) configuration entries for extension $extension"
               
-              if ($extensionData) {
+              if ($extensionData -and $extensionData.Count -gt 0) {
                 # Determine PHP version for selecting correct values
                 $phpVersionKey = "${{ matrix.php-version }}"
                 Write-Host "Processing configuration for PHP version: $phpVersionKey"
@@ -358,26 +362,28 @@ jobs:
                 Write-Host "Building INI configuration..."
                 $rows = @()
                 foreach ($row in $extensionData) {
-                  $param = [string]$row.parameter
-                  $useFlag = [bool]$row.use
-                  
-                  # Find value for current PHP version
-                  $valueText = ""
-                  if ($row.php_versions -and $row.php_versions.PSObject.Properties[$phpVersionKey]) {
-                    $valueText = [string]$row.php_versions.PSObject.Properties[$phpVersionKey].Value
-                  }
-                  
-                  # Handle special values
-                  if ($valueText -eq "(none)") { continue }
-                  if ($valueText -eq "(empty)") { $valueText = "" }
-                  
-                  $commentText = if ($commentMap.ContainsKey($param)) { [string]$commentMap[$param] } else { "" }
-                  
-                  $rows += [pscustomobject]@{
-                    Parameter   = $param
-                    Value       = $valueText
-                    Comment     = $commentText
-                    IsCommented = (-not $useFlag)
+                  if ($row -and $row.parameter) {
+                    $param = [string]$row.parameter
+                    $useFlag = if ($row.use -ne $null) { [bool]$row.use } else { $true }
+                    
+                    # Find value for current PHP version
+                    $valueText = ""
+                    if ($row.php_versions -and $row.php_versions.PSObject.Properties[$phpVersionKey]) {
+                      $valueText = [string]$row.php_versions.PSObject.Properties[$phpVersionKey].Value
+                    }
+                    
+                    # Handle special values
+                    if ($valueText -eq "(none)") { continue }
+                    if ($valueText -eq "(empty)") { $valueText = "" }
+                    
+                    $commentText = if ($commentMap.ContainsKey($param)) { [string]$commentMap[$param] } else { "" }
+                    
+                    $rows += [pscustomobject]@{
+                      Parameter   = $param
+                      Value       = $valueText
+                      Comment     = $commentText
+                      IsCommented = (-not $useFlag)
+                    }
                   }
                 }
                 
@@ -420,11 +426,13 @@ jobs:
                   }
                   
                   $lines.Add("")
+                  
+                  # Write INI file
+                  Set-Content -Path $iniPath -Encoding UTF8 -Value ($lines -join [Environment]::NewLine)
+                  Write-Host "Generated INI config: $iniPath"
+                } else {
+                  Write-Host "No valid configuration rows found for extension $extension"
                 }
-                
-                # Write INI file
-                Set-Content -Path $iniPath -Encoding UTF8 -Value ($lines -join [Environment]::NewLine)
-                Write-Host "Generated INI config: $iniPath"
               } else {
                 Write-Host "No configuration data found for extension $extension"
               }
