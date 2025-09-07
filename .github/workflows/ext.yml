@@ -152,15 +152,23 @@ jobs:
 
           PLAN_JSON='[]'
           while IFS= read -r row; do
-            ext=$(echo "$row" | jq -r '.ext')
-            ver=$(echo "$row" | jq -r '.ver')
-            tag="${ext}-${ver}"
-            file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
-            url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
-            PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
+            if [[ -n "$row" ]]; then
+              ext=$(echo "$row" | jq -r '.ext')
+              ver=$(echo "$row" | jq -r '.ver')
+              tag="${ext}-${ver}"
+              file="php_${ext}-${ver}-${PHP}-${TS}-${TOOL}-x64.zip"
+              url="https://github.com/OSPanel/php-windows-builder/releases/download/${tag}/${file}"
+              PLAN_JSON=$(echo "$PLAN_JSON" | jq --arg url "$url" --arg file "$file" '. + [{url:$url,file:$file}]')
+            fi
           done <<< "$DOWNLOADS"
 
-          echo "plan=$PLAN_JSON" >> "$GITHUB_OUTPUT"
+          # Записываем JSON в файл, а затем читаем его в переменную окружения
+          echo "$PLAN_JSON" > plan.json
+          {
+            echo "plan<<EOF"
+            cat plan.json
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
 
       - name: Download all extension archives
         shell: pwsh
