@@ -248,8 +248,11 @@ jobs:
                   $sasl2Dir = Join-Path $tempDir "sasl2"
                   New-Item -ItemType Directory -Path $sasl2Dir -Force | Out-Null
                   $destPath = Join-Path $sasl2Dir "plugin_sasldb.dll"
-                  Move-Item $saslPlugin $destPath -Force
-                  Write-Host "Moved sasl2\plugin_sasldb.dll to root"
+                  if (-not (Test-Path $destPath)) {
+                    New-Item -ItemType Directory -Path $sasl2Dir -Force | Out-Null
+                    Move-Item $saslPlugin $destPath -Force
+                    Write-Host "Moved sasl2\plugin_sasldb.dll to root"
+                  }
                 }
               }
               
@@ -264,7 +267,7 @@ jobs:
               
               # Step 8: Move all files and folders (except *.dll files and ext folder) to 3rd-party\$extension
               Get-ChildItem -Path $tempDir | Where-Object { 
-                $_.Name -ne "ext" -and $_.Name -ne "3rd-party" -and
+                $_.Name -ne "ext" -and $_.Name -ne "3rd-party" -and $_.Name -ne "sasl2" -and
                 ($_.PSIsContainer -or $_.Extension -ne ".dll")
               } | ForEach-Object {
                 $destPath = Join-Path $thirdPartyDir $_.Name
