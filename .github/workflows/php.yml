@@ -85,8 +85,10 @@ jobs:
           $phpts = "${{ matrix.ts }}"
           $phparch = "${{ matrix.arch }}"
           $artifactName = "artifacts-${version}-${phparch}-${phpts}"
+          $releaseTag = "php-${version}"
           
           Write-Host "Looking for artifact: $artifactName"
+          Write-Host "Release tag: $releaseTag"
           
           # Получаем список всех артефактов для этого запуска
           $artifactsJson = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
@@ -137,7 +139,7 @@ jobs:
           }
           
           # Переименование файлов: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32 с правильным регистром
-          $zipFiles = Get-ChildItem -Filter "*.zip"
+          $zipFiles = Get-ChildItem -Filter "*.zip" | Where-Object { $_.Name -ne "artifact_wrapper.zip" }
           if ($zipFiles.Count -eq 0) {
             Write-Host "No ZIP files found in extracted artifact"
             exit 1
@@ -165,19 +167,19 @@ jobs:
             }
           }
           
-          # Проверяем существование релиза
+          # Проверяем существование релиза более надежным способом
           $releaseExists = $false
           try {
-            gh release view "php-${version}" -R ${{ github.repository }} | Out-Null
+            $releaseInfo = gh api repos/${{ github.repository }}/releases/tags/$releaseTag
             $releaseExists = $true
-            Write-Host "Release php-${version} already exists"
+            Write-Host "Release $releaseTag already exists"
           }
           catch {
             $releaseExists = $false
-            Write-Host "Release php-${version} does not exist"
+            Write-Host "Release $releaseTag does not exist"
           }
           
-          # Создаем или обновляем релиз
+          # Получаем файлы для загрузки (исключая artifact_wrapper.zip)
           $phpFiles = Get-ChildItem -Filter "php-*.zip"
           if ($phpFiles.Count -eq 0) {
             Write-Host "No PHP files to upload"
@@ -187,13 +189,28 @@ jobs:
           Write-Host "Files to upload:"
           $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
           
-          if (-not $releaseExists) {
-            Write-Host "Creating new release..."
-            gh release create "php-${version}" $phpFiles.Name -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+          # Создаем или обновляем релиз
+          try {
+            if (-not $releaseExists) {
+              Write-Host "Creating new release..."
+              $fileList = ($phpFiles.Name -join ' ')
+              $createCommand = "gh release create `"$releaseTag`" $fileList --title `"PHP $version`" --notes `"Release of PHP version $version`" --repo ${{ github.repository }}"
+              Write-Host "Command: $createCommand"
+              Invoke-Expression $createCommand
+            }
+            else {
+              Write-Host "Uploading to existing release..."
+              foreach ($file in $phpFiles) {
+                Write-Host "Uploading: $($file.Name)"
+                $uploadCommand = "gh release upload `"$releaseTag`" `"$($file.Name)`" --repo ${{ github.repository }} --clobber"
+                Write-Host "Command: $uploadCommand"
+                Invoke-Expression $uploadCommand
+              }
+            }
+            Write-Host "Release process completed successfully"
           }
-          else {
-            Write-Host "Uploading to existing release..."
-            gh release upload "php-${version}" $phpFiles.Name -R ${{ github.repository }} --clobber
+          catch {
+            Write-Host "Error during release process: $($_.Exception.Message)"
+            Write-Host "Error details: $_"
+            exit 1
           }
-          
-          Write-Host "Release process completed successfully"
