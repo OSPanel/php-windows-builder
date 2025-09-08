@@ -70,13 +70,45 @@ jobs:
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
 
+  # Новое задание для создания релизов (выполняется только один раз для каждой версии PHP)
+  create-releases:
+    runs-on: ubuntu-latest
+    needs: [generate-matrix, php]
+    strategy:
+      matrix:
+        php-version: ${{ fromJson(needs.generate-matrix.outputs.matrix).include[*].php-version }}
+    steps:
+      - name: Create release for PHP ${{ matrix.php-version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION="${{ matrix.php-version }}"
+          RELEASE_TAG="php-${VERSION}"
+          
+          echo "Creating/checking release for PHP ${VERSION}"
+          
+          # Проверяем существование релиза
+          if gh release view "${RELEASE_TAG}" -R ${{ github.repository }} >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} already exists, deleting it to recreate..."
+            gh release delete "${RELEASE_TAG}" -R ${{ github.repository }} --yes
+          fi
+          
+          # Создаем новый пустой релиз
+          echo "Creating new release ${RELEASE_TAG}..."
+          gh release create "${RELEASE_TAG}" \
+            --title "PHP ${VERSION}" \
+            --notes "Release of PHP version ${VERSION}" \
+            --repo ${{ github.repository }}
+          
+          echo "Release ${RELEASE_TAG} created successfully"
+
   artifacts:
     runs-on: windows-2022
-    needs: [generate-matrix, php]
+    needs: [generate-matrix, create-releases]
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Create PHP release
+      - name: Upload files to PHP release
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -151,7 +183,7 @@ jobs:
             $newName = $originalName
             
             # Убираем -SSE4.2 (с учетом разного регистра)
-            $newName = $newName -replace '-SSE4\.2', ''
+            $newName = $newName -replace '-SSE4.2', ''
             
             # Приводим к нижнему регистру
             $newName = $newName.ToLower()
@@ -174,59 +206,48 @@ jobs:
             exit 1
           }
           
-          Write-Host "Files to upload:"
+          Write-Host "Files to upload to release ${releaseTag}:"
           $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
           
-          # Проверяем все релизы в репозитории
-          Write-Host "Checking existing releases..."
-          try {
-            $releases = gh api repos/${{ github.repository }}/releases
-            $releasesData = $releases | ConvertFrom-Json
-            $existingRelease = $releasesData | Where-Object { $_.tag_name -eq $releaseTag }
-            
-            if ($existingRelease) {
-              Write-Host "Found existing release: $($existingRelease.name) (ID: $($existingRelease.id))"
-              Write-Host "Release state: draft=$($existingRelease.draft), prerelease=$($existingRelease.prerelease)"
-              
-              # Удаляем существующий релиз, чтобы создать новый
-              Write-Host "Deleting existing release to recreate it..."
-              gh api repos/${{ github.repository }}/releases/$($existingRelease.id) -X DELETE
-              Write-Host "Existing release deleted"
-            }
-          }
-          catch {
-            Write-Host "No existing release found or error checking: $($_.Exception.Message)"
-          }
+          # Ждем немного, чтобы релиз точно был создан
+          Start-Sleep -Seconds 5
           
-          # Создаем новый релиз
+          # Загружаем файлы в существующий релиз
           try {
-            Write-Host "Creating new release..."
-            $fileList = ($phpFiles.Name -join ' ')
-            $createCommand = "gh release create `"$releaseTag`" $fileList --title `"PHP $version`" --notes `"Release of PHP version $version`" --repo ${{ github.repository }}"
-            Write-Host "Command: $createCommand"
-            Invoke-Expression $createCommand
-            Write-Host "Release created successfully"
-          }
-          catch {
-            Write-Host "Error creating release: $($_.Exception.Message)"
-            Write-Host "Error details: $_"
-            
-            # Попробуем создать релиз файл за файлом
-            Write-Host "Trying alternative approach - creating empty release first..."
-            try {
-              gh release create $releaseTag --title "PHP $version" --notes "Release of PHP version $version" --repo ${{ github.repository }}
-              Write-Host "Empty release created, now uploading files..."
+            Write-Host "Uploading files to existing release ${releaseTag}..."
+            foreach ($file in $phpFiles) {
+              Write-Host "Uploading: $($file.Name)"
+              $maxRetries = 3
+              $retryCount = 0
+              $uploaded = $false
               
-              foreach ($file in $phpFiles) {
-                Write-Host "Uploading: $($file.Name)"
-                gh release upload $releaseTag $file.Name --repo ${{ github.repository }}
+              while (-not $uploaded -and $retryCount -lt $maxRetries) {
+                try {
+                  gh release upload $releaseTag $file.Name --repo ${{ github.repository }} --clobber
+                  Write-Host "Successfully uploaded: $($file.Name)"
+                  $uploaded = $true
+                }
+                catch {
+                  $retryCount++
+                  Write-Host "Upload attempt $retryCount failed for $($file.Name): $($_.Exception.Message)"
+                  if ($retryCount -lt $maxRetries) {
+                    Write-Host "Retrying in 10 seconds..."
+                    Start-Sleep -Seconds 10
+                  }
+                }
               }
-              Write-Host "All files uploaded successfully"
+              
+              if (-not $uploaded) {
+                Write-Host "Failed to upload $($file.Name) after $maxRetries attempts"
+                exit 1
+              }
             }
-            catch {
-              Write-Host "Alternative approach also failed: $($_.Exception.Message)"
-              exit 1
-            }
+            Write-Host "All files uploaded successfully to release ${releaseTag}"
+          }
+          catch {
+            Write-Host "Error uploading files: $($_.Exception.Message)"
+            Write-Host "Error details: $_"
+            exit 1
           }
           
-          Write-Host "Release process completed successfully"
+          Write-Host "Upload process completed successfully"
