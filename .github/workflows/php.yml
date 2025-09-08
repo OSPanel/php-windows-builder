@@ -135,12 +135,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          $version = "${{ matrix.php-version }}"
-          $releaseTag = "php-${version}"
+          $phpVersion = "${{ matrix.php-version }}"
+          $releaseTag = "php-${phpVersion}"
           $errorOccurred = $false
           
-          Write-Host "Processing artifacts for PHP version: $version"
-          Write-Host "Release tag: $releaseTag"
+          Write-Host "Processing artifacts for PHP version: ${phpVersion}"
+          Write-Host "Release tag: ${releaseTag}"
           
           try {
             # Создаем папку для всех файлов
@@ -159,15 +159,15 @@ jobs:
             
             # Ищем артефакты для текущей версии PHP (любые TS/NTS)
             $versionArtifacts = $artifacts.artifacts | Where-Object { 
-              $_.name -like "artifacts-${version}-*" 
+              $_.name -like "artifacts-${phpVersion}-*" 
             }
             
             if ($versionArtifacts.Count -eq 0) {
-              Write-Host "No artifacts found for PHP version $version. Skipping..."
+              Write-Host "No artifacts found for PHP version ${phpVersion}. Skipping..."
               exit 0
             }
             
-            Write-Host "Found $($versionArtifacts.Count) artifacts for PHP $version"
+            Write-Host "Found $($versionArtifacts.Count) artifacts for PHP ${phpVersion}"
             
             # Скачиваем и распаковываем все артефакты в одну папку
             foreach ($artifact in $versionArtifacts) {
@@ -182,10 +182,10 @@ jobs:
               $downloadUrl = "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$($artifact.id)/zip"
               $zipFileName = "$($artifact.name).zip"
               
-              Write-Host "Downloading from: $downloadUrl"
+              Write-Host "Downloading from: ${downloadUrl}"
               Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile $zipFileName
               
-              Write-Host "Extracting $zipFileName..."
+              Write-Host "Extracting ${zipFileName}..."
               Expand-Archive -Path $zipFileName -DestinationPath $extractDir -Force
               
               Remove-Item $zipFileName -Force
@@ -193,15 +193,15 @@ jobs:
             
             # Получаем все PHP файлы из извлеченной папки
             $allFiles = Get-ChildItem -Path $extractDir -Filter "*.zip" | Where-Object { 
-              $_.Name -like "php-*" -and $_.Name -like "*${version}*"
+              $_.Name -like "php-*" -and $_.Name -like "*${phpVersion}*"
             }
             
             if ($allFiles.Count -eq 0) {
-              Write-Host "No PHP files found for version $version"
+              Write-Host "No PHP files found for version ${phpVersion}"
               exit 0
             }
             
-            Write-Host "Found $($allFiles.Count) PHP files for version $version:"
+            Write-Host "Found $($allFiles.Count) PHP files for version ${phpVersion}:"
             $allFiles | ForEach-Object { Write-Host "- $($_.Name)" }
             
             # Переименовываем файлы: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32
@@ -224,16 +224,16 @@ jobs:
               
               if ($originalName -ne $newName) {
                 Rename-Item -Path $file.FullName -NewName $newName
-                Write-Host "Renamed: $originalName -> $newName"
+                Write-Host "Renamed: ${originalName} -> ${newName}"
               } else {
-                Write-Host "No rename needed: $originalName"
+                Write-Host "No rename needed: ${originalName}"
               }
               
               $renamedFiles += Get-Item $newPath
             }
             
             # Загружаем все файлы в релиз
-            Write-Host "Uploading $($renamedFiles.Count) files to release $releaseTag..."
+            Write-Host "Uploading $($renamedFiles.Count) files to release ${releaseTag}..."
             foreach ($file in $renamedFiles) {
               Write-Host "Uploading: $($file.Name)"
               
@@ -249,7 +249,7 @@ jobs:
                 }
                 catch {
                   $retryCount++
-                  Write-Host "Upload attempt $retryCount failed for $($file.Name): $($_.Exception.Message)"
+                  Write-Host "Upload attempt ${retryCount} failed for $($file.Name): $($_.Exception.Message)"
                   if ($retryCount -lt $maxRetries) {
                     Write-Host "Retrying in 5 seconds..."
                     Start-Sleep -Seconds 5
@@ -258,12 +258,12 @@ jobs:
               }
               
               if (-not $uploaded) {
-                Write-Host "Failed to upload $($file.Name) after $maxRetries attempts"
+                Write-Host "Failed to upload $($file.Name) after ${maxRetries} attempts"
                 throw "Failed to upload $($file.Name)"
               }
             }
             
-            Write-Host "All files uploaded successfully to release $releaseTag"
+            Write-Host "All files uploaded successfully to release ${releaseTag}"
             
           }
           catch {
@@ -274,15 +274,15 @@ jobs:
           
           # Если произошла ошибка, удаляем релиз
           if ($errorOccurred) {
-            Write-Host "Error occurred, cleaning up release $releaseTag..."
+            Write-Host "Error occurred, cleaning up release ${releaseTag}..."
             try {
               gh release delete $releaseTag -R ${{ github.repository }} --yes --cleanup-tag
-              Write-Host "Release $releaseTag deleted due to error"
+              Write-Host "Release ${releaseTag} deleted due to error"
             }
             catch {
-              Write-Host "Failed to delete release $releaseTag: $($_.Exception.Message)"
+              Write-Host "Failed to delete release ${releaseTag}: $($_.Exception.Message)"
             }
             exit 1
           }
           
-          Write-Host "Process completed successfully for PHP $version"
+          Write-Host "Process completed successfully for PHP ${phpVersion}"
