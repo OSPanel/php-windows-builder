@@ -85,9 +85,18 @@ jobs:
           
           # Проверяем существование релиза
           if gh release view "${RELEASE_TAG}" -R ${{ github.repository }} >/dev/null 2>&1; then
-            echo "Release ${RELEASE_TAG} already exists, deleting it to recreate..."
-            gh release delete "${RELEASE_TAG}" -R ${{ github.repository }} --yes
+            echo "Release ${RELEASE_TAG} already exists, deleting it..."
+            gh release delete "${RELEASE_TAG}" -R ${{ github.repository }} --yes --cleanup-tag
           fi
+          
+          # Дополнительно проверяем и удаляем тег, если он существует
+          if git ls-remote --tags origin | grep -q "refs/tags/${RELEASE_TAG}$"; then
+            echo "Tag ${RELEASE_TAG} still exists, deleting it..."
+            gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/${RELEASE_TAG} || true
+          fi
+          
+          # Ждем немного для синхронизации
+          sleep 2
           
           # Создаем новый пустой релиз
           echo "Creating new release ${RELEASE_TAG}..."
@@ -267,7 +276,7 @@ jobs:
           if ($errorOccurred) {
             Write-Host "Error occurred, cleaning up release $releaseTag..."
             try {
-              gh release delete $releaseTag -R ${{ github.repository }} --yes
+              gh release delete $releaseTag -R ${{ github.repository }} --yes --cleanup-tag
               Write-Host "Release $releaseTag deleted due to error"
             }
             catch {
