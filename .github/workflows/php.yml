@@ -31,6 +31,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
+      php-versions: ${{ steps.set-matrix.outputs.php-versions }}
     steps:
       - id: set-matrix
         run: |
@@ -41,6 +42,7 @@ jobs:
           IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
           IFS=',' read -ra PHP_VALUES <<< "$PHP_VERSIONS"
           
+          # Создаем матрицу для сборки
           MATRIX_JSON="{\"include\":["
           SEP=""
           for PHP_VERSION in "${PHP_VALUES[@]}"; do
@@ -51,32 +53,26 @@ jobs:
           done
           MATRIX_JSON+="]}"
 
+          # Создаем массив уникальных версий PHP для релизов
+          PHP_VERSIONS_JSON="["
+          SEP=""
+          for PHP_VERSION in "${PHP_VALUES[@]}"; do
+            PHP_VERSIONS_JSON+="${SEP}\"$PHP_VERSION\""
+            SEP=","
+          done
+          PHP_VERSIONS_JSON+="]"
+
           echo "Generated matrix: $MATRIX_JSON"
+          echo "PHP versions: $PHP_VERSIONS_JSON"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
+          echo "php-versions=$PHP_VERSIONS_JSON" >> $GITHUB_OUTPUT
 
-  php:
-    needs: generate-matrix
-    runs-on: windows-2022
-    strategy:
-      matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Build
-        uses: ./php
-        with:
-          php-version: ${{ matrix.php-version }}
-          arch: ${{ matrix.arch }}
-          ts: ${{ matrix.ts }}
-
-  # Новое задание для создания релизов (выполняется только один раз для каждой версии PHP)
   create-releases:
     runs-on: ubuntu-latest
-    needs: [generate-matrix, php]
+    needs: generate-matrix
     strategy:
       matrix:
-        php-version: ${{ fromJson(needs.generate-matrix.outputs.matrix).include[*].php-version }}
+        php-version: ${{ fromJson(needs.generate-matrix.outputs.php-versions) }}
     steps:
       - name: Create release for PHP ${{ matrix.php-version }}
         env:
@@ -102,128 +98,143 @@ jobs:
           
           echo "Release ${RELEASE_TAG} created successfully"
 
-  artifacts:
-    runs-on: windows-2022
+  php:
     needs: [generate-matrix, create-releases]
+    runs-on: windows-2022
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Upload files to PHP release
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        uses: ./php
+        with:
+          php-version: ${{ matrix.php-version }}
+          arch: ${{ matrix.arch }}
+          ts: ${{ matrix.ts }}
+
+  process-artifacts:
+    runs-on: windows-2022
+    needs: [generate-matrix, create-releases, php]
+    strategy:
+      matrix:
+        php-version: ${{ fromJson(needs.generate-matrix.outputs.php-versions) }}
+    steps:
+      - name: Process and upload artifacts for PHP ${{ matrix.php-version }}
         shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           $version = "${{ matrix.php-version }}"
-          $phpts = "${{ matrix.ts }}"
-          $phparch = "${{ matrix.arch }}"
-          $artifactName = "artifacts-${version}-${phparch}-${phpts}"
           $releaseTag = "php-${version}"
+          $errorOccurred = $false
           
-          Write-Host "Looking for artifact: $artifactName"
+          Write-Host "Processing artifacts for PHP version: $version"
           Write-Host "Release tag: $releaseTag"
           
-          # Получаем список всех артефактов для этого запуска
-          $artifactsJson = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
-          $artifacts = $artifactsJson | ConvertFrom-Json
-          
-          Write-Host "Available artifacts:"
-          $artifacts.artifacts | ForEach-Object {
-            Write-Host "- $($_.name)"
-          }
-          
-          # Ищем нужный артефакт
-          $artifact = $artifacts.artifacts | Where-Object { $_.name -eq $artifactName }
-          
-          if (-not $artifact) {
-            Write-Host "Artifact '$artifactName' not found. Skipping..."
-            exit 0
-          }
-          
-          $artifactId = $artifact.id
-          Write-Host "Found artifact ID: $artifactId"
-          
-          # Скачиваем артефакт
           try {
-            $headers = @{
-              "Authorization" = "Bearer ${{ secrets.GITHUB_TOKEN }}"
-              "Accept" = "application/vnd.github+json"
-              "X-GitHub-Api-Version" = "2022-11-28"
+            # Создаем папку для всех файлов
+            $extractDir = "all_files"
+            New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
+            
+            # Получаем список всех артефактов для этого запуска
+            Write-Host "Getting artifacts list..."
+            $artifactsJson = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
+            $artifacts = $artifactsJson | ConvertFrom-Json
+            
+            Write-Host "Available artifacts:"
+            $artifacts.artifacts | ForEach-Object {
+              Write-Host "- $($_.name)"
             }
             
-            $downloadUrl = "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifactId}/zip"
-            Write-Host "Downloading from: $downloadUrl"
-            
-            Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile "artifact_wrapper.zip"
-            Write-Host "Download completed successfully"
-          }
-          catch {
-            Write-Host "Error downloading artifact: $($_.Exception.Message)"
-            exit 1
-          }
-          
-          # Распаковываем артефакт
-          if (Test-Path "artifact_wrapper.zip") {
-            Expand-Archive -Path "artifact_wrapper.zip" -DestinationPath "." -Force
-            Write-Host "Artifact extracted successfully"
-          } else {
-            Write-Host "Artifact file not found after download"
-            exit 1
-          }
-          
-          # Переименование файлов: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32 с правильным регистром
-          $zipFiles = Get-ChildItem -Filter "*.zip" | Where-Object { $_.Name -ne "artifact_wrapper.zip" }
-          if ($zipFiles.Count -eq 0) {
-            Write-Host "No ZIP files found in extracted artifact"
-            exit 1
-          }
-          
-          Write-Host "Processing ZIP files:"
-          $zipFiles | ForEach-Object {
-            $originalName = $_.Name
-            $newName = $originalName
-            
-            # Убираем -SSE4.2 (с учетом разного регистра)
-            $newName = $newName -replace '-SSE4.2', ''
-            
-            # Приводим к нижнему регистру
-            $newName = $newName.ToLower()
-            
-            # Заменяем -win32- на -Win32-
-            $newName = $newName -replace '-win32-', '-Win32-'
-            
-            if ($originalName -ne $newName) {
-              Rename-Item -Path $_.FullName -NewName $newName
-              Write-Host "Renamed: $originalName -> $newName"
-            } else {
-              Write-Host "No rename needed: $originalName"
+            # Ищем артефакты для текущей версии PHP (любые TS/NTS)
+            $versionArtifacts = $artifacts.artifacts | Where-Object { 
+              $_.name -like "artifacts-${version}-*" 
             }
-          }
-          
-          # Получаем файлы для загрузки (исключая artifact_wrapper.zip)
-          $phpFiles = Get-ChildItem -Filter "php-*.zip"
-          if ($phpFiles.Count -eq 0) {
-            Write-Host "No PHP files to upload"
-            exit 1
-          }
-          
-          Write-Host "Files to upload to release ${releaseTag}:"
-          $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
-          
-          # Ждем немного, чтобы релиз точно был создан
-          Start-Sleep -Seconds 5
-          
-          # Загружаем файлы в существующий релиз
-          try {
-            Write-Host "Uploading files to existing release ${releaseTag}..."
-            foreach ($file in $phpFiles) {
+            
+            if ($versionArtifacts.Count -eq 0) {
+              Write-Host "No artifacts found for PHP version $version. Skipping..."
+              exit 0
+            }
+            
+            Write-Host "Found $($versionArtifacts.Count) artifacts for PHP $version"
+            
+            # Скачиваем и распаковываем все артефакты в одну папку
+            foreach ($artifact in $versionArtifacts) {
+              Write-Host "Processing artifact: $($artifact.name)"
+              
+              $headers = @{
+                "Authorization" = "Bearer ${{ secrets.GITHUB_TOKEN }}"
+                "Accept" = "application/vnd.github+json"
+                "X-GitHub-Api-Version" = "2022-11-28"
+              }
+              
+              $downloadUrl = "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/$($artifact.id)/zip"
+              $zipFileName = "$($artifact.name).zip"
+              
+              Write-Host "Downloading from: $downloadUrl"
+              Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile $zipFileName
+              
+              Write-Host "Extracting $zipFileName..."
+              Expand-Archive -Path $zipFileName -DestinationPath $extractDir -Force
+              
+              Remove-Item $zipFileName -Force
+            }
+            
+            # Получаем все PHP файлы из извлеченной папки
+            $allFiles = Get-ChildItem -Path $extractDir -Filter "*.zip" | Where-Object { 
+              $_.Name -like "php-*" -and $_.Name -like "*${version}*"
+            }
+            
+            if ($allFiles.Count -eq 0) {
+              Write-Host "No PHP files found for version $version"
+              exit 0
+            }
+            
+            Write-Host "Found $($allFiles.Count) PHP files for version $version:"
+            $allFiles | ForEach-Object { Write-Host "- $($_.Name)" }
+            
+            # Переименовываем файлы: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32
+            Write-Host "Renaming files..."
+            $renamedFiles = @()
+            foreach ($file in $allFiles) {
+              $originalName = $file.Name
+              $newName = $originalName
+              
+              # Убираем -SSE4.2 (с учетом разного регистра)
+              $newName = $newName -replace '-SSE4\.2', ''
+              
+              # Приводим к нижнему регистру
+              $newName = $newName.ToLower()
+              
+              # Заменяем -win32- на -Win32-
+              $newName = $newName -replace '-win32-', '-Win32-'
+              
+              $newPath = Join-Path $extractDir $newName
+              
+              if ($originalName -ne $newName) {
+                Rename-Item -Path $file.FullName -NewName $newName
+                Write-Host "Renamed: $originalName -> $newName"
+              } else {
+                Write-Host "No rename needed: $originalName"
+              }
+              
+              $renamedFiles += Get-Item $newPath
+            }
+            
+            # Загружаем все файлы в релиз
+            Write-Host "Uploading $($renamedFiles.Count) files to release $releaseTag..."
+            foreach ($file in $renamedFiles) {
               Write-Host "Uploading: $($file.Name)"
+              
               $maxRetries = 3
               $retryCount = 0
               $uploaded = $false
               
               while (-not $uploaded -and $retryCount -lt $maxRetries) {
                 try {
-                  gh release upload $releaseTag $file.Name --repo ${{ github.repository }} --clobber
+                  gh release upload $releaseTag $file.FullName --repo ${{ github.repository }} --clobber
                   Write-Host "Successfully uploaded: $($file.Name)"
                   $uploaded = $true
                 }
@@ -231,23 +242,38 @@ jobs:
                   $retryCount++
                   Write-Host "Upload attempt $retryCount failed for $($file.Name): $($_.Exception.Message)"
                   if ($retryCount -lt $maxRetries) {
-                    Write-Host "Retrying in 10 seconds..."
-                    Start-Sleep -Seconds 10
+                    Write-Host "Retrying in 5 seconds..."
+                    Start-Sleep -Seconds 5
                   }
                 }
               }
               
               if (-not $uploaded) {
                 Write-Host "Failed to upload $($file.Name) after $maxRetries attempts"
-                exit 1
+                throw "Failed to upload $($file.Name)"
               }
             }
-            Write-Host "All files uploaded successfully to release ${releaseTag}"
+            
+            Write-Host "All files uploaded successfully to release $releaseTag"
+            
           }
           catch {
-            Write-Host "Error uploading files: $($_.Exception.Message)"
+            Write-Host "Error occurred: $($_.Exception.Message)"
             Write-Host "Error details: $_"
+            $errorOccurred = $true
+          }
+          
+          # Если произошла ошибка, удаляем релиз
+          if ($errorOccurred) {
+            Write-Host "Error occurred, cleaning up release $releaseTag..."
+            try {
+              gh release delete $releaseTag -R ${{ github.repository }} --yes
+              Write-Host "Release $releaseTag deleted due to error"
+            }
+            catch {
+              Write-Host "Failed to delete release $releaseTag: $($_.Exception.Message)"
+            }
             exit 1
           }
           
-          Write-Host "Upload process completed successfully"
+          Write-Host "Process completed successfully for PHP $version"
