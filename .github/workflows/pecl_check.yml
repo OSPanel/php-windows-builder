@@ -33,18 +33,14 @@ jobs:
               $matrixMax = ($matrixVersions | Sort-Object -Descending)[0]
 
               try {
-                  Write-Output "📡 Checking $ext ..."
                   $peclRaw = Invoke-RestMethod https://pecl.php.net/rest/r/$ext/latest.txt
-                  if ($peclRaw -match 'RC|beta|alpha') {
-                      Write-Output "⏭ $ext → latest is pre-release $peclRaw, skipping"
-                      continue
-                  }
+                  if ($peclRaw -match 'RC|beta|alpha') { continue }
+
                   $peclVer = Normalize-Version $peclRaw
 
+                  # Выводим инфу ТОЛЬКО если версия в pecl больше чем в матрице
                   if ($peclVer -and $peclVer -gt $matrixMax) {
                       Write-Host "🔄 $ext => матрица $matrixMax < pecl $peclVer"
-                  } else {
-                      Write-Output "✅ $ext up to date ($matrixMax)"
                   }
               } catch {
                   Write-Warning "⚠️ $ext нет записи в PECL"
