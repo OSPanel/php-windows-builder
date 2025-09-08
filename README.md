@@ -1,9 +1,9 @@
 # 🐘 PHP & Extensions Pack Build Repository
 
-[PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)  
-[Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)  
-[GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)  
-[OSPanel](https://img.shields.io/badge/OSPanel-Compatible-orange?style=for-the-badge)
+![PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)
+![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)
+![OSPanel](https://img.shields.io/badge/OSPanel-Compatible-orange?style=for-the-badge)
 
 **Automated PHP and extensions build for OSPanel**
 
