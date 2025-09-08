@@ -30,10 +30,13 @@ jobs:
                   $apiUrl = "https://api.github.com/repos/$owner/$repo/releases/latest"
 
                   try {
-                      $resp = Invoke-RestMethod -Headers @{ "User-Agent"="gh-actions" } -Uri $apiUrl
+                      $resp = Invoke-RestMethod -Headers @{ "User-Agent"="gh-actions" } -Uri $apiUrl -ErrorAction Stop
+                      if (-not $resp.tag_name) {
+                          return $null
+                      }
                       return $resp.tag_name
                   } catch {
-                      Write-Warning "⚠️ Ошибка запроса GitHub API для $repoUrl"
+                      # если нет релизов или репа не отвечает → вернём $null
                       return $null
                   }
               } else {
@@ -58,6 +61,7 @@ jobs:
 
                   if ($sourceUrl -and $sourceUrl -match 'github\.com') {
                       $tag = Get-GitHubLatestTag $sourceUrl
+                      if (-not $tag) { continue }   # нет релизов → пропускаем
                       $latestVer = Normalize-Version $tag
                   }
                   else {
