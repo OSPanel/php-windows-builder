@@ -55,7 +55,7 @@
 
 | Problem | Cause | Solution |
 |---------|-------|----------|
-| `"VCRUNTIME140.dll not found"` | Missing Visual C++ Redistributable | Install [VC++ Redist](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
+| `"VCRUNTIME140.dll not found"` | Missing Visual C++ Redistributable | Install [VC++ Redist](https://github.com/OSPanel/SystemPreparationTool) |
 | `"Illegal instruction"` | CPU does not support SSE4.2 | Use a compatible build |
 | `"Extension not loaded"` | Missing extension DLL | Ensure the file exists in `ext/` |
 
