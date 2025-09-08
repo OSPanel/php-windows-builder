@@ -71,157 +71,38 @@ jobs:
           ts: ${{ matrix.ts }}
 
   artifacts:
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     needs: [generate-matrix, php]
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
-      - name: Download and process PHP release
+      - name: Create PHP release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
         run: |
-          $version = "${{ matrix.php-version }}"
-          $phpts = "${{ matrix.ts }}"
-          $phparch = "${{ matrix.arch }}"
-          $artifact_name = "artifacts-${version}-${phparch}-${phpts}"
-
-          # Determine toolset based on PHP version
-          $toolset = switch -Regex ($version) {
-            "^7\." { "vc15" }
-            "^8\.[0-3]" { "vs16" }
-            default { "vs17" }
-          }
-
-          # Determine architecture suffix for filename
-          $archSuffix = if ($phparch -eq "x64") { "x64" } else { "x86" }
-
-          # Download build artifact
-          Write-Host "Downloading artifact: $artifact_name"
-          $artifact_id = (gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
-
-          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" `
-            -H "Accept: application/vnd.github.v3+json" `
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" `
+          version="${{ matrix.php-version }}"
+          phpts="${{ matrix.ts }}"
+          phparch="${{ matrix.arch }}"
+          artifact_name="artifacts-${version}-${phparch}-${phpts}"
+          
+          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
+          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
             -o "artifact_wrapper.zip"
 
-          # Extract build artifact
-          Expand-Archive -Path "artifact_wrapper.zip" -DestinationPath "." -Force
+          unzip -o "artifact_wrapper.zip"
 
-          # Find PHP ZIP file and remember its name
-          $phpZipFile = Get-ChildItem -Filter "php-*.zip" | Select-Object -First 1
-          if (-not $phpZipFile) {
-            throw "PHP ZIP file not found"
-          }
-
-          $originalZipName = $phpZipFile.Name
-          Write-Host "Found PHP release: $originalZipName"
-
-          # Create temporary directory and extract PHP release
-          $tempDir = "temp_php_processing"
-          New-Item -ItemType Directory -Path $tempDir -Force
-          Expand-Archive -Path $phpZipFile.FullName -DestinationPath $tempDir -Force
-
-          # Download and extract extensions pack without overwriting existing files
-          $extPackUrl = "https://github.com/OSPanel/php-windows-builder/releases/download/ext-pack/php-ext-pack-${version}-${phpts}-Win32-${toolset}-${archSuffix}.zip"
-          Write-Host "Downloading extensions pack from: $extPackUrl"
-
-          try {
-            curl -L $extPackUrl -o "ext-pack.zip"
-            if (Test-Path "ext-pack.zip") {
-              # Extract extensions without overwriting existing files
-              Add-Type -AssemblyName System.IO.Compression.FileSystem
-              $extZip = [System.IO.Compression.ZipFile]::OpenRead("ext-pack.zip")
-              foreach ($entry in $extZip.Entries) {
-                $destinationPath = Join-Path $tempDir $entry.FullName
-                $destinationDir = Split-Path $destinationPath -Parent
-                if (-not (Test-Path $destinationDir)) {
-                  New-Item -ItemType Directory -Path $destinationDir -Force
-                }
-                if (-not (Test-Path $destinationPath) -and -not $entry.FullName.EndsWith('/')) {
-                  [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destinationPath)
-                }
+          Get-ChildItem -Filter *.zip | ForEach-Object {
+              $lowerName = $_.Name.ToLower()
+              if ($_.Name -ne $lowerName) {
+                  Rename-Item -Path $_.FullName -NewName $lowerName
               }
-              $extZip.Dispose()
-              Remove-Item "ext-pack.zip" -Force
-            }
-          } catch {
-            Write-Host "Warning: Could not download extensions pack: $_"
           }
+          
+          if ! gh release view php-${version} -R ${{ github.repository }}; then
+            gh release create php-${version} php-* -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+          else
+            gh release upload php-${version} php-* -R ${{ github.repository }} --clobber
+          fi
 
-          # Remove specified DLL files
-          $filesToRemove = @("fbclient.dll", "IM_MOD_*.dll", "CORE_RL_*.dll", "FILTER_analyze*.dll")
-          foreach ($pattern in $filesToRemove) {
-            Get-ChildItem -Path $tempDir -Filter $pattern -Recurse | Remove-Item -Force -ErrorAction SilentlyContinue
-          }
-          Write-Host "Removed unwanted DLL files"
-
-          # Remove config directory
-          $configPath = Join-Path $tempDir "config"
-          if (Test-Path $configPath) {
-            Remove-Item $configPath -Recurse -Force
-            Write-Host "Removed config directory"
-          }
-
-          # Create browscap.ini file
-          Write-Host "Downloading browscap.ini"
-          curl -L "https://browscap.org/stream?q=Lite_PHP_BrowsCapINI" -o (Join-Path $tempDir "browscap.ini")
-
-          # Create phpinfo.php file
-          $phpinfoContent = "<?php phpinfo() ?>"
-          $phpinfoContent | Out-File -FilePath (Join-Path $tempDir "phpinfo.php") -Encoding UTF8
-          Write-Host "Created phpinfo.php"
-
-          # Create extras/mibs directory and download net-snmp
-          $extrasDir = Join-Path $tempDir "extras"
-          $mibsDir = Join-Path $extrasDir "mibs"
-          New-Item -ItemType Directory -Path $mibsDir -Force
-
-          $netSnmpUrl = switch ($version) {
-            { $_ -match "^7\.[2-4]$" -or $_ -eq "8.0" } {
-              "https://netix.dl.sourceforge.net/project/net-snmp/net-snmp/5.7.3/net-snmp-5.7.3.zip?viasf=1"
-            }
-            default {
-              "https://netix.dl.sourceforge.net/project/net-snmp/net-snmp/5.9.4/net-snmp-5.9.4.zip?viasf=1"
-            }
-          }
-
-          Write-Host "Downloading net-snmp from: $netSnmpUrl"
-          curl -L $netSnmpUrl -o "net-snmp.zip"
-
-          if (Test-Path "net-snmp.zip") {
-            $netSnmpZip = [System.IO.Compression.ZipFile]::OpenRead("net-snmp.zip")
-            foreach ($entry in $netSnmpZip.Entries) {
-              if ($entry.FullName -match "net-snmp[^/]*/mibs/.*" -and -not $entry.FullName.EndsWith('/')) {
-                $fileName = Split-Path $entry.FullName -Leaf
-                $destinationPath = Join-Path $mibsDir $fileName
-                [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, $destinationPath)
-              }
-            }
-            $netSnmpZip.Dispose()
-            Remove-Item "net-snmp.zip" -Force
-            Write-Host "Extracted net-snmp MIB files"
-          }
-
-          # Package back with original name
-          Write-Host "Creating final archive: $originalZipName"
-          Compress-Archive -Path (Join-Path $tempDir "*") -DestinationPath $originalZipName -Force
-
-          # Convert to lowercase if needed
-          $lowerName = $originalZipName.ToLower()
-          if ($originalZipName -ne $lowerName) {
-            Rename-Item -Path $originalZipName -NewName $lowerName
-            $originalZipName = $lowerName
-          }
-
-          # Clean up temporary directory
-          Remove-Item $tempDir -Recurse -Force
-
-          # Create or update release
-          if (!(gh release view php-${version} -R ${{ github.repository }} 2>$null)) {
-            gh release create php-${version} $originalZipName -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
-            Write-Host "Created new release php-${version}"
-          } else {
-            gh release upload php-${version} $originalZipName -R ${{ github.repository }} --clobber
-            Write-Host "Updated existing release php-${version}"
-          }
