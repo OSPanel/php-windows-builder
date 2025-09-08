@@ -32,15 +32,14 @@ jobs:
                   try {
                       $resp = Invoke-RestMethod -Headers @{ "User-Agent"="gh-actions" } -Uri $apiUrl -ErrorAction Stop
                       if (-not $resp.tag_name) {
-                          return $null
+                          return @{ tag=$null; url=$apiUrl }
                       }
-                      return $resp.tag_name
+                      return @{ tag=$resp.tag_name; url=$apiUrl }
                   } catch {
-                      # если нет релизов или репа не отвечает → вернём $null
-                      return $null
+                      return @{ tag=$null; url=$apiUrl }
                   }
               } else {
-                  return $null
+                  return @{ tag=$null; url=$null }
               }
           }
 
@@ -55,14 +54,16 @@ jobs:
               $matrixMax = ($matrixVersions | Sort-Object -Descending)[0]
 
               $sourceUrl = $matrixEntry.url
+              $checkUrl = ""
 
               try {
                   $latestVer = $null
 
                   if ($sourceUrl -and $sourceUrl -match 'github\.com') {
-                      $tag = Get-GitHubLatestTag $sourceUrl
-                      if (-not $tag) { continue }   # нет релизов → пропускаем
-                      $latestVer = Normalize-Version $tag
+                      $tagInfo = Get-GitHubLatestTag $sourceUrl
+                      $checkUrl = $tagInfo.url
+                      if (-not $tagInfo.tag) { continue }   # нет релизов → пропускаем
+                      $latestVer = Normalize-Version $tagInfo.tag
                   }
                   else {
                       if ($ext -eq 'ddtrace') {
@@ -70,15 +71,20 @@ jobs:
                       } else {
                           $peclName = $ext
                       }
-                      $peclRaw = Invoke-RestMethod "https://pecl.php.net/rest/r/$peclName/latest.txt"
+                      $checkUrl = "https://pecl.php.net/rest/r/$peclName/latest.txt"
+                      $peclRaw = Invoke-RestMethod $checkUrl
                       if ($peclRaw -match 'RC|beta|alpha') { continue }
                       $latestVer = Normalize-Version $peclRaw
                   }
 
                   if ($latestVer -and $latestVer -gt $matrixMax) {
                       Write-Host "🔄 ${ext} => матрица $matrixMax < latest $latestVer"
+                      Write-Host "   URL: $checkUrl"
                   }
               } catch {
                   Write-Warning "⚠️ ${ext} ошибка при проверке"
+                  if ($checkUrl) {
+                      Write-Host "   URL: $checkUrl"
+                  }
               }
           }
