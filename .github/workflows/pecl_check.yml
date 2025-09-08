@@ -1,4 +1,4 @@
-name: Check PECL or GitHub versions
+name: Check PHP Extension versions
 
 on:
   workflow_dispatch:
