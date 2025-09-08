@@ -1,18 +1,15 @@
 name: Check PECL versions
 
 on:
-  workflow_dispatch: # запуск по кнопке в Actions
+  workflow_dispatch: # запуск вручную по кнопке
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
 
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
-
-      - name: Setup PowerShell
-        uses: actions/setup-powershell@v2
 
       - name: Run PECL check
         shell: pwsh
@@ -38,9 +35,9 @@ jobs:
               try {
                   Write-Output "📡 Checking $ext ..."
                   $peclRaw = Invoke-RestMethod https://pecl.php.net/rest/r/$ext/latest.txt
-                  if ($peclRaw -match 'RC|beta|alpha') { 
+                  if ($peclRaw -match 'RC|beta|alpha') {
                       Write-Output "⏭ $ext → latest is pre-release $peclRaw, skipping"
-                      continue 
+                      continue
                   }
                   $peclVer = Normalize-Version $peclRaw
 
