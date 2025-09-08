@@ -1,7 +1,7 @@
-name: Check PECL versions
+name: Check PECL or GitHub versions
 
 on:
-  workflow_dispatch: # запуск вручную по кнопке
+  workflow_dispatch:
 
 jobs:
   check:
@@ -11,7 +11,7 @@ jobs:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Run PECL check
+      - name: Run extension check
         shell: pwsh
         run: |
           Write-Host "=== Чтение matrix.json ==="
@@ -23,8 +23,29 @@ jobs:
               try { return [version]$v } catch { return $null }
           }
 
+          function Get-GitHubLatestTag($repoUrl) {
+              # repoUrl типа https://github.com/vendor/project
+              if ($repoUrl -match 'github\.com/([^/]+)/([^/]+)') {
+                  $owner = $matches[1]
+                  $repo  = $matches[2] -replace '\.git$', ''
+                  $apiUrl = "https://api.github.com/repos/$owner/$repo/releases/latest"
+
+                  # GitHub API требует user-agent
+                  try {
+                      $resp = Invoke-RestMethod -Headers @{ "User-Agent"="gh-actions" } -Uri $apiUrl
+                      return $resp.tag_name
+                  } catch {
+                      Write-Warning "⚠️ Ошибка запроса GitHub API: $repoUrl"
+                      return $null
+                  }
+              } else {
+                  return $null
+              }
+          }
+
           foreach ($ext in $j.PSObject.Properties.Name) {
-              $matrixVersions = $j.$ext.ver.PSObject.Properties.Value `
+              $matrixEntry  = $j.$ext
+              $matrixVersions = $matrixEntry.ver.PSObject.Properties.Value `
                   | ForEach-Object { Normalize-Version $_ } `
                   | Where-Object { $_ }
 
@@ -32,17 +53,33 @@ jobs:
 
               $matrixMax = ($matrixVersions | Sort-Object -Descending)[0]
 
+              # используем url для определения источника
+              $sourceUrl = $matrixEntry.url
+
               try {
-                  $peclRaw = Invoke-RestMethod https://pecl.php.net/rest/r/$ext/latest.txt
-                  if ($peclRaw -match 'RC|beta|alpha') { continue }
+                  $latestVer = $null
 
-                  $peclVer = Normalize-Version $peclRaw
+                  if ($sourceUrl -and $sourceUrl -match 'github\.com') {
+                      # проверяем на GitHub
+                      $tag = Get-GitHubLatestTag $sourceUrl
+                      $latestVer = Normalize-Version $tag
+                  }
+                  else {
+                      # проверяем на PECL
+                      if ($ext -eq 'ddtrace') {
+                          $peclName = 'datadog_trace'
+                      } else {
+                          $peclName = $ext
+                      }
+                      $peclRaw = Invoke-RestMethod "https://pecl.php.net/rest/r/$peclName/latest.txt"
+                      if ($peclRaw -match 'RC|beta|alpha') { continue }
+                      $latestVer = Normalize-Version $peclRaw
+                  }
 
-                  # Выводим инфу ТОЛЬКО если версия в pecl больше чем в матрице
-                  if ($peclVer -and $peclVer -gt $matrixMax) {
-                      Write-Host "🔄 $ext => матрица $matrixMax < pecl $peclVer"
+                  if ($latestVer -and $latestVer -gt $matrixMax) {
+                      Write-Host "🔄 $ext => матрица $matrixMax < latest $latestVer"
                   }
               } catch {
-                  Write-Warning "⚠️ $ext нет записи в PECL"
+                  Write-Warning "⚠️ $ext: ошибка при проверке"
               }
           }
