@@ -97,7 +97,7 @@ jobs:
             if [ -f "$file" ]; then
               new_name=$(echo "$file" | sed -i 's/-[Ss][Ss][Ee]4\.2//g')
               new_name=$(echo "$new_name" | tr '[:upper:]' '[:lower:]')
-              
+              new_name=$(echo "$new_name" | sed 's/-win32-/-Win32-/g')
               if [ "$file" != "$new_name" ]; then
                 mv "$file" "$new_name"
                 echo "Renamed: $file -> $new_name"
