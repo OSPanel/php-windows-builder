@@ -1,4 +1,4 @@
-[![en](https://img.shields.io/badge/lang-ru-green.svg)](https://github.com/OSPanel/php-windows-builder)
+[![en](https://img.shields.io/badge/lang-en-green.svg)](https://github.com/OSPanel/php-windows-builder)
 
 # 🐘 PHP & Extensions Pack Build Repository
 
