@@ -1,0 +1,55 @@
+name: Check PECL versions
+
+on:
+  workflow_dispatch: # запуск по кнопке в Actions
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup PowerShell
+        uses: actions/setup-powershell@v2
+
+      - name: Run PECL check
+        shell: pwsh
+        run: |
+          Write-Host "=== Чтение matrix.json ==="
+          $j = Get-Content "extension/BuildPhpExtension/config/matrix.json" | ConvertFrom-Json
+
+          function Normalize-Version($v) {
+              if (-not $v -or $v -notmatch '^\d') { return $null }
+              $v = $v -replace '[^0-9\.]', ''
+              try { return [version]$v } catch { return $null }
+          }
+
+          foreach ($ext in $j.PSObject.Properties.Name) {
+              $matrixVersions = $j.$ext.ver.PSObject.Properties.Value `
+                  | ForEach-Object { Normalize-Version $_ } `
+                  | Where-Object { $_ }
+
+              if (-not $matrixVersions) { continue }
+
+              $matrixMax = ($matrixVersions | Sort-Object -Descending)[0]
+
+              try {
+                  Write-Output "📡 Checking $ext ..."
+                  $peclRaw = Invoke-RestMethod https://pecl.php.net/rest/r/$ext/latest.txt
+                  if ($peclRaw -match 'RC|beta|alpha') { 
+                      Write-Output "⏭ $ext → latest is pre-release $peclRaw, skipping"
+                      continue 
+                  }
+                  $peclVer = Normalize-Version $peclRaw
+
+                  if ($peclVer -and $peclVer -gt $matrixMax) {
+                      Write-Host "🔄 $ext => матрица $matrixMax < pecl $peclVer"
+                  } else {
+                      Write-Output "✅ $ext up to date ($matrixMax)"
+                  }
+              } catch {
+                  Write-Warning "⚠️ $ext нет записи в PECL"
+              }
+          }
