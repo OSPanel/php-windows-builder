@@ -31,7 +31,6 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
-      unique-versions: ${{ steps.set-matrix.outputs.unique-versions }}
     steps:
       - id: set-matrix
         run: |
@@ -52,19 +51,8 @@ jobs:
           done
           MATRIX_JSON+="]}"
 
-          # Создаем массив уникальных версий PHP
-          UNIQUE_VERSIONS_JSON="["
-          SEP=""
-          for PHP_VERSION in "${PHP_VALUES[@]}"; do
-            UNIQUE_VERSIONS_JSON+="${SEP}\"$PHP_VERSION\""
-            SEP=","
-          done
-          UNIQUE_VERSIONS_JSON+="]"
-
           echo "Generated matrix: $MATRIX_JSON"
-          echo "Unique versions: $UNIQUE_VERSIONS_JSON"
           echo "matrix=$MATRIX_JSON" >> $GITHUB_OUTPUT
-          echo "unique-versions=$UNIQUE_VERSIONS_JSON" >> $GITHUB_OUTPUT
 
   php:
     needs: generate-matrix
@@ -82,13 +70,13 @@ jobs:
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
 
-  # Создание релизов для уникальных версий PHP
+  # Новое задание для создания релизов (выполняется только один раз для каждой версии PHP)
   create-releases:
     runs-on: ubuntu-latest
     needs: [generate-matrix, php]
     strategy:
       matrix:
-        php-version: ${{ fromJson(needs.generate-matrix.outputs.unique-versions) }}
+        php-version: ${{ fromJson(needs.generate-matrix.outputs.matrix).include[*].php-version }}
     steps:
       - name: Create release for PHP ${{ matrix.php-version }}
         env:
@@ -103,8 +91,6 @@ jobs:
           if gh release view "${RELEASE_TAG}" -R ${{ github.repository }} >/dev/null 2>&1; then
             echo "Release ${RELEASE_TAG} already exists, deleting it to recreate..."
             gh release delete "${RELEASE_TAG}" -R ${{ github.repository }} --yes
-            echo "Waiting 5 seconds after deletion..."
-            sleep 5
           fi
           
           # Создаем новый пустой релиз
@@ -224,14 +210,14 @@ jobs:
           $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
           
           # Ждем немного, чтобы релиз точно был создан
-          Start-Sleep -Seconds 10
+          Start-Sleep -Seconds 5
           
           # Загружаем файлы в существующий релиз
           try {
             Write-Host "Uploading files to existing release ${releaseTag}..."
             foreach ($file in $phpFiles) {
               Write-Host "Uploading: $($file.Name)"
-              $maxRetries = 5
+              $maxRetries = 3
               $retryCount = 0
               $uploaded = $false
               
@@ -245,8 +231,8 @@ jobs:
                   $retryCount++
                   Write-Host "Upload attempt $retryCount failed for $($file.Name): $($_.Exception.Message)"
                   if ($retryCount -lt $maxRetries) {
-                    Write-Host "Retrying in 15 seconds..."
-                    Start-Sleep -Seconds 15
+                    Write-Host "Retrying in 10 seconds..."
+                    Start-Sleep -Seconds 10
                   }
                 }
               }
