@@ -71,42 +71,57 @@ jobs:
           ts: ${{ matrix.ts }}
 
   artifacts:
-    runs-on: ubuntu-latest
+    runs-on: windows-2022
     needs: [generate-matrix, php]
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
     steps:
       - name: Create PHP release
+        shell: pwsh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          version="${{ matrix.php-version }}"
-          phpts="${{ matrix.ts }}"
-          phparch="${{ matrix.arch }}"
-          artifact_name="artifacts-${version}-${phparch}-${phpts}"
+          $version = "${{ matrix.php-version }}"
+          $phpts = "${{ matrix.ts }}"
+          $phparch = "${{ matrix.arch }}"
+          $artifactName = "artifacts-${version}-${phparch}-${phpts}"
           
-          artifact_id=$(gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifact_name}\") | .id")
-          curl -L -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-            -H "Accept: application/vnd.github.v3+json" \
-            "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifact_id}/zip" \
-            -o "artifact_wrapper.zip"
-
-          unzip -o "artifact_wrapper.zip"
-
-          for file in *.zip; do
-            if [ -f "$file" ]; then
-              new_name=$(echo "$file" | sed -i 's/-[Ss][Ss][Ee]4\.2//g')
-              new_name=$(echo "$new_name" | tr '[:upper:]' '[:lower:]')
-              new_name=$(echo "$new_name" | sed 's/-win32-/-Win32-/g')
-              if [ "$file" != "$new_name" ]; then
-                mv "$file" "$new_name"
-                echo "Renamed: $file -> $new_name"
-              fi
-            fi
-          done
+          $artifactId = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifactName}\") | .id"
           
-          if ! gh release view php-${version} -R ${{ github.repository }}; then
-            gh release create php-${version} php-* -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
-          else
-            gh release upload php-${version} php-* -R ${{ github.repository }} --clobber
-          fi
+          $headers = @{
+            "Authorization" = "token ${{ secrets.GITHUB_TOKEN }}"
+            "Accept" = "application/vnd.github.v3+json"
+          }
+          
+          Invoke-WebRequest -Uri "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifactId}/zip" -Headers $headers -OutFile "artifact_wrapper.zip"
+          
+          Expand-Archive -Path "artifact_wrapper.zip" -DestinationPath "." -Force
+          
+          Get-ChildItem -Filter "*.zip" | ForEach-Object {
+            $originalName = $_.Name
+            $newName = $originalName
+            $newName = $newName -replace '-SSE4\.2', '', 'IgnoreCase'
+            $newName = $newName.ToLower()            
+            $newName = $newName -replace '-win32-', '-Win32-'
+            
+            if ($originalName -ne $newName) {
+              Rename-Item -Path $_.FullName -NewName $newName
+              Write-Host "Renamed: $originalName -> $newName"
+            }
+          }
+          
+          $releaseExists = $false
+          try {
+            gh release view "php-${version}" -R ${{ github.repository }}
+            $releaseExists = $true
+          }
+          catch {
+            $releaseExists = $false
+          }
+          
+          if (-not $releaseExists) {
+            gh release create "php-${version}" php-*.zip -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+          }
+          else {
+            gh release upload "php-${version}" php-*.zip -R ${{ github.repository }} --clobber
+          }
