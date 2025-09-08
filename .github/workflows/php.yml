@@ -93,12 +93,14 @@ jobs:
 
           unzip -o "artifact_wrapper.zip"
 
-          # Переименование файлов в нижний регистр (bash версия)
           for file in *.zip; do
             if [ -f "$file" ]; then
-              lowercase_name=$(echo "$file" | tr '[:upper:]' '[:lower:]')
-              if [ "$file" != "$lowercase_name" ]; then
-                mv "$file" "$lowercase_name"
+              new_name=$(echo "$file" | sed -i 's/-[Ss][Ss][Ee]4\.2//g')
+              new_name=$(echo "$new_name" | tr '[:upper:]' '[:lower:]')
+              
+              if [ "$file" != "$new_name" ]; then
+                mv "$file" "$new_name"
+                echo "Renamed: $file -> $new_name"
               fi
             fi
           done
