@@ -14,7 +14,6 @@ jobs:
       - name: Run extension check
         shell: pwsh
         run: |
-          Write-Host "=== Чтение matrix.json ==="
           $j = Get-Content "extension/BuildPhpExtension/config/matrix.json" | ConvertFrom-Json
 
           function Normalize-Version($v) {
