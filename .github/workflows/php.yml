@@ -86,42 +86,114 @@ jobs:
           $phparch = "${{ matrix.arch }}"
           $artifactName = "artifacts-${version}-${phparch}-${phpts}"
           
-          $artifactId = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts --jq ".artifacts[] | select(.name==\"${artifactName}\") | .id"
+          Write-Host "Looking for artifact: $artifactName"
           
-          $headers = @{
-            "Authorization" = "token ${{ secrets.GITHUB_TOKEN }}"
-            "Accept" = "application/vnd.github.v3+json"
+          # Получаем список всех артефактов для этого запуска
+          $artifactsJson = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
+          $artifacts = $artifactsJson | ConvertFrom-Json
+          
+          Write-Host "Available artifacts:"
+          $artifacts.artifacts | ForEach-Object {
+            Write-Host "- $($_.name)"
           }
           
-          Invoke-WebRequest -Uri "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifactId}/zip" -Headers $headers -OutFile "artifact_wrapper.zip"
+          # Ищем нужный артефакт
+          $artifact = $artifacts.artifacts | Where-Object { $_.name -eq $artifactName }
           
-          Expand-Archive -Path "artifact_wrapper.zip" -DestinationPath "." -Force
+          if (-not $artifact) {
+            Write-Host "Artifact '$artifactName' not found. Skipping..."
+            exit 0
+          }
           
-          Get-ChildItem -Filter "*.zip" | ForEach-Object {
+          $artifactId = $artifact.id
+          Write-Host "Found artifact ID: $artifactId"
+          
+          # Скачиваем артефакт
+          try {
+            $headers = @{
+              "Authorization" = "Bearer ${{ secrets.GITHUB_TOKEN }}"
+              "Accept" = "application/vnd.github+json"
+              "X-GitHub-Api-Version" = "2022-11-28"
+            }
+            
+            $downloadUrl = "https://api.github.com/repos/${{ github.repository }}/actions/artifacts/${artifactId}/zip"
+            Write-Host "Downloading from: $downloadUrl"
+            
+            Invoke-WebRequest -Uri $downloadUrl -Headers $headers -OutFile "artifact_wrapper.zip"
+            Write-Host "Download completed successfully"
+          }
+          catch {
+            Write-Host "Error downloading artifact: $($_.Exception.Message)"
+            exit 1
+          }
+          
+          # Распаковываем артефакт
+          if (Test-Path "artifact_wrapper.zip") {
+            Expand-Archive -Path "artifact_wrapper.zip" -DestinationPath "." -Force
+            Write-Host "Artifact extracted successfully"
+          } else {
+            Write-Host "Artifact file not found after download"
+            exit 1
+          }
+          
+          # Переименование файлов: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32 с правильным регистром
+          $zipFiles = Get-ChildItem -Filter "*.zip"
+          if ($zipFiles.Count -eq 0) {
+            Write-Host "No ZIP files found in extracted artifact"
+            exit 1
+          }
+          
+          Write-Host "Processing ZIP files:"
+          $zipFiles | ForEach-Object {
             $originalName = $_.Name
             $newName = $originalName
-            $newName = $newName -replace '-SSE4\.2', '', 'IgnoreCase'
-            $newName = $newName.ToLower()            
+            
+            # Убираем -SSE4.2 (с учетом разного регистра)
+            $newName = $newName -replace '-SSE4\.2', ''
+            
+            # Приводим к нижнему регистру
+            $newName = $newName.ToLower()
+            
+            # Заменяем -win32- на -Win32-
             $newName = $newName -replace '-win32-', '-Win32-'
             
             if ($originalName -ne $newName) {
               Rename-Item -Path $_.FullName -NewName $newName
               Write-Host "Renamed: $originalName -> $newName"
+            } else {
+              Write-Host "No rename needed: $originalName"
             }
           }
           
+          # Проверяем существование релиза
           $releaseExists = $false
           try {
-            gh release view "php-${version}" -R ${{ github.repository }}
+            gh release view "php-${version}" -R ${{ github.repository }} | Out-Null
             $releaseExists = $true
+            Write-Host "Release php-${version} already exists"
           }
           catch {
             $releaseExists = $false
+            Write-Host "Release php-${version} does not exist"
           }
           
+          # Создаем или обновляем релиз
+          $phpFiles = Get-ChildItem -Filter "php-*.zip"
+          if ($phpFiles.Count -eq 0) {
+            Write-Host "No PHP files to upload"
+            exit 1
+          }
+          
+          Write-Host "Files to upload:"
+          $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
+          
           if (-not $releaseExists) {
-            gh release create "php-${version}" php-*.zip -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
+            Write-Host "Creating new release..."
+            gh release create "php-${version}" $phpFiles.Name -t "PHP ${version}" -n "Release of PHP version ${version}" -R ${{ github.repository }}
           }
           else {
-            gh release upload "php-${version}" php-*.zip -R ${{ github.repository }} --clobber
+            Write-Host "Uploading to existing release..."
+            gh release upload "php-${version}" $phpFiles.Name -R ${{ github.repository }} --clobber
           }
+          
+          Write-Host "Release process completed successfully"
