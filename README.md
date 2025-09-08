@@ -1,83 +1,91 @@
+Конечно! Вот перевод README на английский:  
+
+---
+
 # 🐘 PHP & Extensions Pack Build Repository
 
-![PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)
-![Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)
-![GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)
-![OSPanel](https://img.shields.io/badge/OSPanel-Compatible-orange?style=for-the-badge)
+[PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)  
+[Windows](https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white)  
+[GitHub Actions](https://img.shields.io/badge/github%20actions-%232671E5.svg?style=for-the-badge&logo=githubactions&logoColor=white)  
+[OSPanel](https://img.shields.io/badge/OSPanel-Compatible-orange?style=for-the-badge)
 
-**Автоматизированная сборка PHP и расширений для OSPanel**
-
----
-
-## ✨ Особенности
-
-> 🚀 **Оптимизированные сборки** для Windows 10+ с поддержкой SSE4.2  
-> 🔧 **Автоматизированная сборка** через GitHub Actions  
-> 📦 **Полный набор расширений** для веб-разработки  
-> 🎯 **Специально для OSPanel** - готовые к использованию сборки
-
-## ⚠️ Важное уведомление о совместимости
-
-| ✅ Совместимо | ❌ Не совместимо |
-|---------------|------------------|
-| Windows 10+ | Windows 7/8.1 |
-| CPU с SSE4.2+ | Старые процессоры |
-| OSPanel | Официальные сборки PHP |
-
-**🔍 Детали совместимости:**
-- Все сборки генерируются для Windows 10 и новее
-- Используются CPU оптимизации с инструкциями SSE4.2
-- Бинарные файлы не совместимы с официальными сборками php.net
-
-## 📋 Системные требования
-
-| 💻 Минимальные требования | 🚀 Рекомендуемые требования |
-|---------------------------|------------------------------|
-| **ОС:** Windows 10 (версия 1903+) | **ОС:** Windows 11 |
-| **Архитектура:** x86_64 (64-bit) | **Процессор:** Intel Core i5 / AMD Ryzen 5 |
-| **Процессор:** Intel Core i3 / AMD Ryzen 3 | **RAM:** 8GB+ |
-| **Инструкции:** SSE4.2 поддержка | **SSD:** Для лучшей производительности |
-
-## 🧪 Тестирование
-
-| Тип теста | Команда | Описание |
-|-----------|---------|----------|
-| **Синтаксис** | `php -l script.php` | Проверка синтаксиса |
-| **Модули** | `php -m` | Список загруженных модулей |
-| **Конфигурация** | `php --ini` | Файлы конфигурации |
-| **Информация** | `php -i` | Полная информация о PHP |
-
-## 🔍 Диагностика
-
-### 🚨 Частые проблемы
-
-| Проблема | Причина | Решение |
-|----------|---------|---------|
-| `"VCRUNTIME140.dll not found"` | Отсутствует Visual C++ Redistributable | Установить [VC++ Redist](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
-| `"Illegal instruction"` | Процессор не поддерживает SSE4.2 | Использовать совместимую сборку |
-| `"Extension not loaded"` | Отсутствует DLL расширения | Проверить наличие файла в `ext/` |
-
-## 📊 Сравнение с официальными сборками
-
-| Характеристика | Наши сборки | Официальные |
-|----------------|-------------|-------------|
-| ⚡ **Оптимизации** | SSE4.2 | Generic x86_64 |
-| 📦 **Расширения** | Предустановлены | Базовый набор |
-| 🔧 **OSPanel** | ✅ Готово к работе | ⚙️ Требует настройки |
-| 🚀 **Производительность** | +15-20% | Базовая |
-| 📥 **Размер** | Больше (~50MB) | Меньше (~30MB) |
-
-## 🙏 Благодарности
-
-### 🏆 Команда и сообщество
-
-| Проект | Вклад | Ссылка |
-|--------|-------|--------|
-| **PHP Project** | Основа языка программирования | [php.net](https://www.php.net/) |
-| **OSPanel** | Среда разработки | [ospanel.io](https://ospanel.io/) |
-| **PECL** | Расширения PHP | [pecl.php.net](https://pecl.php.net/) |
-| **Microsoft** | Build Tools и Runtime | [visualstudio.microsoft.com](https://visualstudio.microsoft.com/) |
+**Automated PHP and extensions build for OSPanel**
 
 ---
 
-**Сделано с ❤️ для сообщества PHP разработчиков и пользователей OSPanel**
+## ✨ Features
+
+> 🚀 **Optimized builds** for Windows 10+ with SSE4.2 support  
+> 🔧 **Automated build** via GitHub Actions  
+> 📦 **Full set of extensions** for web development  
+> 🎯 **Specially for OSPanel** – ready-to-use builds
+
+## ⚠️ Important Compatibility Notice
+
+| ✅ Compatible | ❌ Not compatible |
+|---------------|-------------------|
+| Windows 10+   | Windows 7/8.1 |
+| CPU with SSE4.2+ | Older processors |
+| OSPanel       | Official PHP builds |
+
+**🔍 Compatibility details:**
+- All builds are generated for Windows 10 and newer
+- CPU optimizations use SSE4.2 instructions
+- Binaries are not compatible with official php.net builds
+
+## 📋 System Requirements
+
+| 💻 Minimum Requirements | 🚀 Recommended Requirements |
+|--------------------------|------------------------------|
+| **OS:** Windows 10 (version 1903+) | **OS:** Windows 11 |
+| **Architecture:** x86_64 (64-bit) | **CPU:** Intel Core i5 / AMD Ryzen 5 |
+| **CPU:** Intel Core i3 / AMD Ryzen 3 | **RAM:** 8GB+ |
+| **Instructions:** SSE4.2 support | **SSD:** For optimal performance |
+
+## 🧪 Testing
+
+| Test type | Command | Description |
+|-----------|---------|-------------|
+| **Syntax** | `php -l script.php` | Syntax check |
+| **Modules** | `php -m` | List of loaded modules |
+| **Configuration** | `php --ini` | Configuration files |
+| **Info** | `php -i` | Full PHP information |
+
+## 🔍 Diagnostics
+
+### 🚨 Common Issues
+
+| Problem | Cause | Solution |
+|---------|-------|----------|
+| `"VCRUNTIME140.dll not found"` | Missing Visual C++ Redistributable | Install [VC++ Redist](https://aka.ms/vs/17/release/vc_redist.x64.exe) |
+| `"Illegal instruction"` | CPU does not support SSE4.2 | Use a compatible build |
+| `"Extension not loaded"` | Missing extension DLL | Ensure the file exists in `ext/` |
+
+## 📊 Comparison with Official Builds
+
+| Feature | Our Builds | Official |
+|---------|------------|----------|
+| ⚡ **Optimizations** | SSE4.2 | Generic x86_64 |
+| 📦 **Extensions** | Preinstalled | Basic set |
+| 🔧 **OSPanel** | ✅ Ready to use | ⚙️ Requires setup |
+| 🚀 **Performance** | +15–20% | Baseline |
+| 📥 **Size** | Larger (~50MB) | Smaller (~30MB) |
+
+## 🙏 Acknowledgements
+
+### 🏆 Team & Community
+
+| Project | Contribution | Link |
+|---------|--------------|------|
+| **PHP Project** | Core programming language | [php.net](https://www.php.net/) |
+| **OSPanel** | Development environment | [ospanel.io](https://ospanel.io/) |
+| **PECL** | PHP extensions | [pecl.php.net](https://pecl.php.net/) |
+| **Microsoft** | Build Tools and Runtime | [visualstudio.microsoft.com](https://visualstudio.microsoft.com/) |
+
+---
+
+**Made with ❤️ for the PHP developers and OSPanel users community**  
+
+---
+
+Хочешь, я сделаю английскую версию в виде отдельного `README.en.md`, сохраняя структуру и форматирование исходного?
