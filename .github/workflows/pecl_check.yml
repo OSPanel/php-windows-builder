@@ -53,7 +53,7 @@ jobs:
 
               $matrixMax = ($matrixVersions | Sort-Object -Descending)[0]
 
-              $sourceUrl = $matrixEntry.url
+              $sourceUrl = $matrixEntry.source
               $checkUrl = ""
 
               try {
