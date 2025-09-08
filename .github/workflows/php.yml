@@ -167,18 +167,6 @@ jobs:
             }
           }
           
-          # Проверяем существование релиза более надежным способом
-          $releaseExists = $false
-          try {
-            $releaseInfo = gh api repos/${{ github.repository }}/releases/tags/$releaseTag
-            $releaseExists = $true
-            Write-Host "Release $releaseTag already exists"
-          }
-          catch {
-            $releaseExists = $false
-            Write-Host "Release $releaseTag does not exist"
-          }
-          
           # Получаем файлы для загрузки (исключая artifact_wrapper.zip)
           $phpFiles = Get-ChildItem -Filter "php-*.zip"
           if ($phpFiles.Count -eq 0) {
@@ -189,28 +177,56 @@ jobs:
           Write-Host "Files to upload:"
           $phpFiles | ForEach-Object { Write-Host "- $($_.Name)" }
           
-          # Создаем или обновляем релиз
+          # Проверяем все релизы в репозитории
+          Write-Host "Checking existing releases..."
           try {
-            if (-not $releaseExists) {
-              Write-Host "Creating new release..."
-              $fileList = ($phpFiles.Name -join ' ')
-              $createCommand = "gh release create `"$releaseTag`" $fileList --title `"PHP $version`" --notes `"Release of PHP version $version`" --repo ${{ github.repository }}"
-              Write-Host "Command: $createCommand"
-              Invoke-Expression $createCommand
+            $releases = gh api repos/${{ github.repository }}/releases
+            $releasesData = $releases | ConvertFrom-Json
+            $existingRelease = $releasesData | Where-Object { $_.tag_name -eq $releaseTag }
+            
+            if ($existingRelease) {
+              Write-Host "Found existing release: $($existingRelease.name) (ID: $($existingRelease.id))"
+              Write-Host "Release state: draft=$($existingRelease.draft), prerelease=$($existingRelease.prerelease)"
+              
+              # Удаляем существующий релиз, чтобы создать новый
+              Write-Host "Deleting existing release to recreate it..."
+              gh api repos/${{ github.repository }}/releases/$($existingRelease.id) -X DELETE
+              Write-Host "Existing release deleted"
             }
-            else {
-              Write-Host "Uploading to existing release..."
-              foreach ($file in $phpFiles) {
-                Write-Host "Uploading: $($file.Name)"
-                $uploadCommand = "gh release upload `"$releaseTag`" `"$($file.Name)`" --repo ${{ github.repository }} --clobber"
-                Write-Host "Command: $uploadCommand"
-                Invoke-Expression $uploadCommand
-              }
-            }
-            Write-Host "Release process completed successfully"
           }
           catch {
-            Write-Host "Error during release process: $($_.Exception.Message)"
-            Write-Host "Error details: $_"
-            exit 1
+            Write-Host "No existing release found or error checking: $($_.Exception.Message)"
           }
+          
+          # Создаем новый релиз
+          try {
+            Write-Host "Creating new release..."
+            $fileList = ($phpFiles.Name -join ' ')
+            $createCommand = "gh release create `"$releaseTag`" $fileList --title `"PHP $version`" --notes `"Release of PHP version $version`" --repo ${{ github.repository }}"
+            Write-Host "Command: $createCommand"
+            Invoke-Expression $createCommand
+            Write-Host "Release created successfully"
+          }
+          catch {
+            Write-Host "Error creating release: $($_.Exception.Message)"
+            Write-Host "Error details: $_"
+            
+            # Попробуем создать релиз файл за файлом
+            Write-Host "Trying alternative approach - creating empty release first..."
+            try {
+              gh release create $releaseTag --title "PHP $version" --notes "Release of PHP version $version" --repo ${{ github.repository }}
+              Write-Host "Empty release created, now uploading files..."
+              
+              foreach ($file in $phpFiles) {
+                Write-Host "Uploading: $($file.Name)"
+                gh release upload $releaseTag $file.Name --repo ${{ github.repository }}
+              }
+              Write-Host "All files uploaded successfully"
+            }
+            catch {
+              Write-Host "Alternative approach also failed: $($_.Exception.Message)"
+              exit 1
+            }
+          }
+          
+          Write-Host "Release process completed successfully"
