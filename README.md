@@ -1,3 +1,5 @@
+[![ru](https://img.shields.io/badge/lang-ru-green.svg)](https://github.com/OSPanel/php-windows-builder/blob/master/README.ru.md)
+
 # 🐘 PHP & Extensions Pack Build Repository
 
 ![PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)
