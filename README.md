@@ -1,7 +1,3 @@
-Конечно! Вот перевод README на английский:  
-
----
-
 # 🐘 PHP & Extensions Pack Build Repository
 
 [PHP](https://img.shields.io/badge/php-%23777BB4.svg?style=for-the-badge&logo=php&logoColor=white)  
@@ -68,7 +64,7 @@
 | ⚡ **Optimizations** | SSE4.2 | Generic x86_64 |
 | 📦 **Extensions** | Preinstalled | Basic set |
 | 🔧 **OSPanel** | ✅ Ready to use | ⚙️ Requires setup |
-| 🚀 **Performance** | +15–20% | Baseline |
+| 🚀 **Performance** | +15% | Baseline |
 | 📥 **Size** | Larger (~50MB) | Smaller (~30MB) |
 
 ## 🙏 Acknowledgements
@@ -84,8 +80,4 @@
 
 ---
 
-**Made with ❤️ for the PHP developers and OSPanel users community**  
-
----
-
-Хочешь, я сделаю английскую версию в виде отдельного `README.en.md`, сохраняя структуру и форматирование исходного?
+**Made with ❤️ for the PHP developers and OSPanel users community**
