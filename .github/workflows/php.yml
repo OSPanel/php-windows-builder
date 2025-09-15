@@ -25,7 +25,13 @@ on:
         description: Upload artifacts to the downloads server
         required: false
         default: 'true'
-        
+      do-release: # NEW
+        type: choice
+        options: ['true', 'false']
+        description: 'Make Release?'
+        required: false
+        default: 'true'
+
 jobs:
   generate-matrix:
     runs-on: ubuntu-latest
@@ -42,7 +48,6 @@ jobs:
           IFS=',' read -ra TS_VALUES <<< "$TS_INPUT"
           IFS=',' read -ra PHP_VALUES <<< "$PHP_VERSIONS"
           
-          # Создаем матрицу для сборки
           MATRIX_JSON="{\"include\":["
           SEP=""
           for PHP_VERSION in "${PHP_VALUES[@]}"; do
@@ -53,7 +58,6 @@ jobs:
           done
           MATRIX_JSON+="]}"
 
-          # Создаем массив уникальных версий PHP для релизов
           PHP_VERSIONS_JSON="["
           SEP=""
           for PHP_VERSION in "${PHP_VALUES[@]}"; do
@@ -68,6 +72,7 @@ jobs:
           echo "php-versions=$PHP_VERSIONS_JSON" >> $GITHUB_OUTPUT
 
   create-releases:
+    if: ${{ inputs.do-release == 'true' }} # NEW
     runs-on: ubuntu-latest
     needs: generate-matrix
     strategy:
@@ -83,32 +88,25 @@ jobs:
           
           echo "Creating/checking release for PHP ${VERSION}"
           
-          # Проверяем существование релиза
           if gh release view "${RELEASE_TAG}" -R ${{ github.repository }} >/dev/null 2>&1; then
             echo "Release ${RELEASE_TAG} already exists, deleting it..."
             gh release delete "${RELEASE_TAG}" -R ${{ github.repository }} --yes --cleanup-tag
           fi
           
-          # Дополнительно проверяем и удаляем тег, если он существует
           if git ls-remote --tags origin | grep -q "refs/tags/${RELEASE_TAG}$"; then
             echo "Tag ${RELEASE_TAG} still exists, deleting it..."
             gh api -X DELETE repos/${{ github.repository }}/git/refs/tags/${RELEASE_TAG} || true
           fi
           
-          # Ждем немного для синхронизации
           sleep 2
           
-          # Создаем новый пустой релиз
-          echo "Creating new release ${RELEASE_TAG}..."
           gh release create "${RELEASE_TAG}" \
             --title "PHP ${VERSION}" \
             --notes "Release of PHP version ${VERSION}" \
             --repo ${{ github.repository }}
-          
-          echo "Release ${RELEASE_TAG} created successfully"
 
   php:
-    needs: [generate-matrix, create-releases]
+    needs: [generate-matrix]
     runs-on: windows-2022
     strategy:
       matrix: ${{ fromJson(needs.generate-matrix.outputs.matrix) }}
@@ -124,8 +122,9 @@ jobs:
           ts: ${{ matrix.ts }}
 
   process-artifacts:
+    if: ${{ inputs.do-release == 'true' }} # NEW
     runs-on: windows-2022
-    needs: [generate-matrix, create-releases, php]
+    needs: [generate-matrix, php, create-releases]
     strategy:
       matrix:
         php-version: ${{ fromJson(needs.generate-matrix.outputs.php-versions) }}
@@ -143,11 +142,9 @@ jobs:
           Write-Host "Release tag: ${releaseTag}"
           
           try {
-            # Создаем папку для всех файлов
             $extractDir = "all_files"
             New-Item -ItemType Directory -Force -Path $extractDir | Out-Null
             
-            # Получаем список всех артефактов для этого запуска
             Write-Host "Getting artifacts list..."
             $artifactsJson = gh api repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/artifacts
             $artifacts = $artifactsJson | ConvertFrom-Json
@@ -157,7 +154,6 @@ jobs:
               Write-Host "- $($_.name)"
             }
             
-            # Ищем артефакты для текущей версии PHP (любые TS/NTS)
             $versionArtifacts = $artifacts.artifacts | Where-Object { 
               $_.name -like "artifacts-${phpVersion}-*" 
             }
@@ -169,7 +165,6 @@ jobs:
             
             Write-Host "Found $($versionArtifacts.Count) artifacts for PHP ${phpVersion}"
             
-            # Скачиваем и распаковываем все артефакты в одну папку
             foreach ($artifact in $versionArtifacts) {
               Write-Host "Processing artifact: $($artifact.name)"
               
@@ -191,7 +186,6 @@ jobs:
               Remove-Item $zipFileName -Force
             }
             
-            # Получаем все PHP файлы из извлеченной папки
             $allFiles = Get-ChildItem -Path $extractDir -Filter "*.zip" | Where-Object { 
               $_.Name -like "php-*" -and $_.Name -like "*${phpVersion}*"
             }
@@ -204,20 +198,13 @@ jobs:
             Write-Host "Found $($allFiles.Count) PHP files for version ${phpVersion}:"
             $allFiles | ForEach-Object { Write-Host "- $($_.Name)" }
             
-            # Переименовываем файлы: убираем -SSE4.2, приводим к нижнему регистру, но оставляем Win32
             Write-Host "Renaming files..."
             $renamedFiles = @()
             foreach ($file in $allFiles) {
               $originalName = $file.Name
               $newName = $originalName
-              
-              # Убираем -SSE4.2 (с учетом разного регистра)
               $newName = $newName -replace '-SSE4\.2', ''
-              
-              # Приводим к нижнему регистру
               $newName = $newName.ToLower()
-              
-              # Заменяем -win32- на -Win32-
               $newName = $newName -replace '-win32-', '-Win32-'
               
               $newPath = Join-Path $extractDir $newName
@@ -232,7 +219,6 @@ jobs:
               $renamedFiles += Get-Item $newPath
             }
             
-            # Загружаем все файлы в релиз
             Write-Host "Uploading $($renamedFiles.Count) files to release ${releaseTag}..."
             foreach ($file in $renamedFiles) {
               Write-Host "Uploading: $($file.Name)"
@@ -272,7 +258,6 @@ jobs:
             $errorOccurred = $true
           }
           
-          # Если произошла ошибка, удаляем релиз
           if ($errorOccurred) {
             Write-Host "Error occurred, cleaning up release ${releaseTag}..."
             try {
