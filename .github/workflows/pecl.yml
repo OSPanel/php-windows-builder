@@ -104,12 +104,12 @@ jobs:
             echo "Release ${tag} already exists"
           else
             # Если на origin уже есть тег (возможно не Verified) — удалим и пересоздадим через GitHub.
-            if git ls-remote --tags origin | grep -qE "refs/tags/${tag}$"; then
-              echo "Tag ${tag} exists on origin. Deleting to recreate it as Verified..."
-              gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/${tag}" || true
-              git fetch --tags --force || true
-              git push origin ":refs/tags/${tag}" || true
-            fi
+            # if git ls-remote --tags origin | grep -qE "refs/tags/${tag}$"; then
+            #   echo "Tag ${tag} exists on origin. Deleting to recreate it as Verified..."
+            #   gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/${tag}" || true
+            #   git fetch --tags --force || true
+            #   git push origin ":refs/tags/${tag}" || true
+            # fi
 
             # Создаём релиз с target — GitHub создаст Verified тег
             gh release create "${tag}" \
@@ -300,32 +300,31 @@ jobs:
           Write-Host "Uploading $releaseAssetName to release $releaseTag"
           gh release upload $releaseTag $releaseAssetName -R ${{ github.repository }} --clobber
 
-  cleanup-release:
-    runs-on: ubuntu-latest
-    if: failure()
-    needs: [prepare-release, get-extension-matrix, extension]
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Cleanup Release in Case of Failure
-        continue-on-error: true
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -e
-          release_tag="${{ needs.prepare-release.outputs.tag }}"
-          if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
-            assets=$(gh release view "$release_tag" -R ${{ github.repository }} --json assets --jq '.assets[].name' 2>/dev/null || echo "")
-            if [ -n "$assets" ]; then
-              for asset in $assets; do
-                gh release delete-asset "$release_tag" "$asset" -R ${{ github.repository }} -y || true
-              done
-            fi
-            gh release delete "$release_tag" -R ${{ github.repository }} -y || true
-          fi
-          gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
-          
+#   cleanup-release:
+#     runs-on: ubuntu-latest
+#     if: failure()
+#     needs: [prepare-release, get-extension-matrix, extension]
+#     steps:
+#       - name: Checkout repository
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0
+#           token: ${{ secrets.GITHUB_TOKEN }}
+# 
+#      - name: Cleanup Release in Case of Failure
+#         continue-on-error: true
+#         env:
+#           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+#         run: |
+#           set -e
+#           release_tag="${{ needs.prepare-release.outputs.tag }}"
+#           if gh release view "$release_tag" -R ${{ github.repository }} >/dev/null 2>&1; then
+#             assets=$(gh release view "$release_tag" -R ${{ github.repository }} --json assets --jq '.assets[].name' 2>/dev/null || echo "")
+#             if [ -n "$assets" ]; then
+#               for asset in $assets; do
+#                 gh release delete-asset "$release_tag" "$asset" -R ${{ github.repository }} -y || true
+#               done
+#             fi
+#             gh release delete "$release_tag" -R ${{ github.repository }} -y || true
+#           fi
+#           gh api -X DELETE "repos/${{ github.repository }}/git/refs/tags/$release_tag" || true
