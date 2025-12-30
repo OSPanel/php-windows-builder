@@ -7,7 +7,7 @@ function Get-PhpSdk {
     param (
     )
     begin {
-        $sdkVersion = "2.4.0"
+        $sdkVersion = "2.6.0"
         $url = "https://files.ospanel.io/php-sdk-$sdkVersion.zip"
     }
     process {
