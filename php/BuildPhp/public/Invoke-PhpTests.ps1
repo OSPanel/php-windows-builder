@@ -39,6 +39,7 @@ function Invoke-PhpTests {
         }
 
         $currentDirectory = (Get-Location).Path
+        Get-ChildItem $currentDirectory
 
         $tempDirectory = [System.IO.Path]::GetTempPath()
 
@@ -51,7 +52,7 @@ function Invoke-PhpTests {
 
         Set-Location "$buildDirectory"
 
-        Add-TestRequirements -PhpVersion $PhpVersion -Arch $Arch -Ts $Ts -VsVersion $VsData.vs -TestsDirectory $testsDirectory
+        Add-TestRequirements -PhpVersion $PhpVersion -Arch $Arch -Ts $Ts -VsVersion $VsData.vs -TestsDirectory $testsDirectory\artifacts
 
         Set-PhpIniForTests -BuildDirectory $buildDirectory -Opcache $Opcache
 
