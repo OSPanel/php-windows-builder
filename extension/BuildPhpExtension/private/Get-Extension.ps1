@@ -6,6 +6,8 @@ function Get-Extension {
         Extension URL
     .PARAMETER ExtensionRef
         Extension Reference
+    .PARAMETER PhpVersion
+        PHP Version
     .PARAMETER BuildDirectory
         Build directory
     .PARAMETER LocalSrc
@@ -19,12 +21,16 @@ function Get-Extension {
         [Parameter(Mandatory = $false, Position = 1, HelpMessage = 'Extension Reference')]
         [string] $ExtensionRef = '',
 
-        [Parameter(Mandatory = $true, Position = 2, HelpMessage = 'Build directory')]
+        [Parameter(Mandatory = $true, Position=2, HelpMessage='PHP Version')]
+        [ValidateNotNull()]
+        [ValidateLength(1, [int]::MaxValue)]
+        [string] $PhpVersion,
+        [Parameter(Mandatory = $true, Position=3, HelpMessage='Build directory')]
         [ValidateNotNull()]
         [ValidateLength(1, [int]::MaxValue)]
         [string] $BuildDirectory,
 
-        [Parameter(Mandatory = $true, Position = 3, HelpMessage = 'Is source local')]
+        [Parameter(Mandatory = $true, Position=4, HelpMessage='Is source local')]
         [ValidateNotNull()]
         [bool] $LocalSrc = $false
     )
@@ -179,14 +185,24 @@ function Get-Extension {
         $patches = $false
 
         if ($null -ne $Extension) {
-            if (Test-Path -Path "$PSScriptRoot\..\patches\$Extension.ps1") {
-                Add-Patches $Extension
-                $patches = $true
+            if(Test-Path -PATH "$PSScriptRoot\..\patches\${Extension}-$ExtensionRef.ps1") {
+                if((Get-Content "$PSScriptRoot\..\patches\${Extension}-$ExtensionRef.ps1").Contains('config.w32')) {
+                    Add-Patches "$Extension-$ExtensionRef"
+                    $patches = $true
+                }
             }
-
-            if (Test-Path -Path "$PSScriptRoot\..\patches\$Extension-$ExtensionRef.ps1") {
-                Add-Patches "$Extension-$ExtensionRef"
-                $patches = $true
+            
+            if(Test-Path -PATH "$PSScriptRoot\..\patches\${Extension}.ps1") {
+                if((Get-Content "$PSScriptRoot\..\patches\${Extension}.ps1").Contains('config.w32')) {
+                    Add-Patches $Extension
+                    $patches = $true
+                }
+            }
+            
+            if(Test-Path -PATH "$PSScriptRoot\..\patches\php\${PhpVersion}.ps1") {
+                if((Get-Content "$PSScriptRoot\..\patches\php\${PhpVersion}.ps1").Contains('config.w32')) {
+                    Add-Patches "php\${PhpVersion}"
+                    $patches = $true
             }
         }
 
