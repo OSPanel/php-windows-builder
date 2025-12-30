@@ -14,6 +14,7 @@ jobs:
         arch: [x64, x86]
         ts: [nts, ts]
         opcache: [opcache, nocache]
+        test-type: [php, ext]
     runs-on: windows-2022
     steps:
       - name: Checkout
@@ -27,11 +28,13 @@ jobs:
           Invoke-PhpTests -PhpVersion ${{inputs.php-version}} `
                           -Arch ${{matrix.arch}} `
                           -Ts ${{matrix.ts}} `
-                          -Opcache ${{matrix.opcache}}
+                          -Opcache ${{matrix.opcache}} `
+                          -TestType ${{matrix.test-type}}
+                          
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         continue-on-error: true
         with:
-          name: test-results-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}
-          path: test-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}.xml
+          name: test-results-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}-${{matrix.test-type}}
+          path: test-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}-${{matrix.test-type}}.xml
