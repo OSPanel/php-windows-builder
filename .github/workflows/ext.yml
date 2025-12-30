@@ -397,6 +397,7 @@ jobs:
                   "8.2" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/82"
                   "8.3" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/83"
                   "8.4" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/84"
+                  "8.5" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/85"
                 }
                 "ts" = @{
                   "7.2" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/72-zts"
@@ -407,6 +408,7 @@ jobs:
                   "8.2" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/82-zts"
                   "8.3" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/83-zts"
                   "8.4" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/84-zts"
+                  "8.5" = "https://blackfire.io/api/v1/releases/probe/php/windows/amd64/85-zts"
                 }
               }
               "dll_name" = "blackfire_php.dll"
@@ -424,6 +426,7 @@ jobs:
                   "8.2" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc16_x86-64.zip"
                   "8.3" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc16_x86-64.zip"
                   "8.4" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc17_x86-64.zip"
+                  "8.5" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_nonts_vc17_x86-64.zip"
                 }
                 "ts" = @{
                   "7.2" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_vc15_x86-64.zip"
@@ -433,6 +436,7 @@ jobs:
                   "8.2" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_vc16_x86-64.zip"
                   "8.3" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_vc16_x86-64.zip"
                   "8.4" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_vc17_x86-64.zip"
+                  "8.5" = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_win_vc17_x86-64.zip"
                 }
               }
               "dll_name" = "ioncube_loader_win_$phpVersion.dll"
@@ -450,6 +454,7 @@ jobs:
                   "8.2" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
                   "8.3" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
                   "8.4" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
+                  "8.5" = "https://github.com/FirebirdSQL/firebird/releases/download/v4.0.6/Firebird-4.0.6.3221-0-x64.zip"
                 }
               }
               "dll_name" = "fbclient.dll"
