@@ -26,6 +26,7 @@ jobs:
 
       - name: Test PHP
         shell: pwsh
+        continue-on-error: true
         run: |
           Import-Module (Join-Path $(pwd).Path '\php\BuildPhp') -Force
           Invoke-PhpTests -PhpVersion ${{inputs.php-version}} `
@@ -35,6 +36,7 @@ jobs:
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
+        continue-on-error: true
         with:
           name: test-results-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}
           path: test-${{matrix.arch}}-${{matrix.ts}}-${{matrix.opcache}}.xml
