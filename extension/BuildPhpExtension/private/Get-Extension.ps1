@@ -247,9 +247,10 @@ function Get-Extension {
         }
 
         if (-not $patches) {
-            Add-Patches $name
+            Add-Patches "${name}"
+            Add-Patches "php\${PhpVersion}"
         }
-
+        
         if (-not $LocalSrc) {
             Add-BuildLog tick $name "Fetched $name extension"
         }
