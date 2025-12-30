@@ -114,6 +114,9 @@ Function Get-LibrariesFromConfig {
         if($Extension -eq 'parallel') {
             $foundItems += 'pthreads'
         }
+        if($Extension -eq "luasandbox") {
+            $foundItems = @("lua-5.1")
+        }
 
         $highestVersions = @{}
 
