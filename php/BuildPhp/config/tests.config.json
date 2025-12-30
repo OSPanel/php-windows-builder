@@ -1,31 +1,31 @@
 {
     "7.0":
     {
-        "runner": "run-test.php",
+        "runner": "run-tests.php",
         "workers": "",
         "progress": ""
     },
     "7.1":
     {
-        "runner": "run-test.php",
+        "runner": "run-tests.php",
         "workers": "",
         "progress": ""
     },
     "7.2":
     {
-        "runner": "run-test.php",
+        "runner": "run-tests.php",
         "workers": "",
         "progress": ""
     },
     "7.3":
     {
-        "runner": "run-test.php",
+        "runner": "run-tests.php",
         "workers": "",
         "progress": ""
     },
     "7.4":
     {
-        "runner": "run-test.php",
+        "runner": "run-tests.php",
         "workers": "-jNumWorkers",
         "progress": ""
     },
