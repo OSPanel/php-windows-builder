@@ -1,0 +1,13 @@
+{
+    "require":
+    {
+        "lua": "5.1.5"
+    },
+    "php-ext":
+    {
+        "configure-options": [
+        {
+            "name": "enable-lua=shared"
+        }]
+    }
+}
