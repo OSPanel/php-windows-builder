@@ -209,6 +209,7 @@ Function Get-ExtensionConfig {
             }
             $thirdPartyLibraries = @("boost", "instantclient", "odbc_cli")
             $Libraries | Select-Object -Unique | ForEach-Object {
+                Write-Host "Process PECL library: $_"
                 if($thirdPartyLibraries.Contains($_)) {
                     $config.extension_libraries += $_
                 } elseif($null -ne $_ -and -not([string]::IsNullOrWhiteSpace($_))) {
