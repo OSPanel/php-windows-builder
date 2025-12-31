@@ -19,6 +19,7 @@ Function Add-Patches {
         if($null -ne $env:GITHUB_REPOSITORY) {
             if($env:GITHUB_REPOSITORY -eq 'OSPanel/php-windows-builder') {
                 if(Test-Path -PATH $PSScriptRoot\..\patches\$PatchPath) {
+                    Write-Host "EXEC PATCH: $PatchPath"
                     . $PSScriptRoot\..\patches\$PatchPath
                 }
             }
