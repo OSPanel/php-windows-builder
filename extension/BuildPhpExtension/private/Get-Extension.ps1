@@ -203,6 +203,7 @@ function Get-Extension {
                 if((Get-Content "$PSScriptRoot\..\patches\php\${PhpVersion}.ps1").Contains('config.w32')) {
                     Add-Patches "php\${PhpVersion}.ps1"
                     $patches = $true
+                }
             }
         }
 
