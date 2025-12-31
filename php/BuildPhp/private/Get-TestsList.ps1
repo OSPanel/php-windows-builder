@@ -12,7 +12,6 @@ function Get-TestsList {
         [Parameter(Mandatory = $true, Position=0, HelpMessage='Output file')]
         [ValidateNotNull()]
         [ValidateLength(1, [int]::MaxValue)]
-        [string] $OutputFile
         [string] $OutputFile,
         [Parameter(Mandatory = $true, Position=1, HelpMessage='Test type')]
         [ValidateNotNull()]
