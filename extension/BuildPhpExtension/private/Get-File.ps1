@@ -1,88 +1,95 @@
 Function Get-File {
     <#
     .SYNOPSIS
-        Downloads a file from a URL with retries and an optional fallback URL.
-        Compatible with both old and new PowerShell versions.
+        Downloads a file or content. Parses links if content is HTML to support legacy scripts.
     #>
-    [OutputType()]
+    [OutputType([PSCustomObject], [void])]
     param (
         [Parameter(Mandatory = $true, Position=0)]
         [ValidateNotNullOrEmpty()]
         [string] $Url,
 
-        [Parameter(Position=1)]
+        [Parameter(Mandatory = $false, Position=1)]
         [string] $FallbackUrl,
 
-        [Parameter(Position=2)]
+        [Parameter(Mandatory = $false, Position=2)]
         [string] $OutFile = '',
 
-        [Parameter(Position=3)]
+        [Parameter(Mandatory = $false, Position=3)]
         [int] $Retries = 3,
 
-        [Parameter(Position=4)]
+        [Parameter(Mandatory = $false, Position=4)]
         [int] $TimeoutSec = 0
     )
 
+    $currentUrl = $Url
+    
     for ($i = 0; $i -lt $Retries; $i++) {
         try {
-            # Выполняем запрос (без -UseBasicParsing — в новых версиях не нужно)
+            # Если указан OutFile, просто скачиваем файл
             if ($OutFile -ne '') {
-                $result = Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec $TimeoutSec
-            } else {
-                $result = Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec
-            }
+                Invoke-WebRequest -Uri $currentUrl -OutFile $OutFile -TimeoutSec $TimeoutSec -UseBasicParsing
+                return # Возвращаем void, так как файл сохранен на диск
+            } 
+            # Если OutFile нет, нам нужно вернуть объект с контентом и ссылками
+            else {
+                $response = Invoke-WebRequest -Uri $currentUrl -TimeoutSec $TimeoutSec -UseBasicParsing
+                $content = $response.Content
 
-            # Только если мы ничего не сохраняем, возвращаем объект с контентом
-            if ($OutFile -eq '') {
-                # Если нет свойства .Links (новый PS), добавим его вручную
-                if (-not ($result.PSObject.Properties.Name -contains 'Links')) {
-                    # Пробуем распарсить href ссылки из HTML контента
-                    $links = [regex]::Matches($result.Content, 'href="([^"]+)"') |
-                        ForEach-Object { $_.Groups[1].Value }
-
-                    $linkObjects = @()
-                    foreach ($href in $links) {
-                        $linkObjects += [PSCustomObject]@{ Href = $href }
+                # Эмуляция свойства .Links для совместимости с PowerShell Core/7+
+                # Ищем все <a href="..."> или просто href="..."
+                $links = @()
+                $pattern = 'href=["\']([^"\']+)["\']'
+                $matches = [regex]::Matches($content, $pattern, 'IgnoreCase')
+                
+                foreach ($m in $matches) {
+                    # Создаем объект с свойством Href, чтобы работало $obj.Links.Href
+                    $links += [PSCustomObject]@{
+                        Href = $m.Groups[1].Value
                     }
-
-                    # Добавляем свойство Links
-                    Add-Member -InputObject $result -MemberType NoteProperty -Name Links -Value $linkObjects
                 }
 
-                return $result
+                # Возвращаем кастомный объект, который имеет структуру, ожидаемую вашим скриптом
+                return [PSCustomObject]@{
+                    Content = $content
+                    Links   = $links
+                    Status  = $response.StatusCode
+                }
             }
-
-            break
         } catch {
+            # Логика переключения на Fallback URL при последней попытке
             if ($i -eq ($Retries - 1)) {
-                if ($FallbackUrl) {
+                if ($FallbackUrl -and $currentUrl -ne $FallbackUrl) {
+                    # Сбрасываем счетчик и меняем URL на запасной, пробуем еще раз (цикл Retries)
+                    # Но чтобы не усложнять рекурсией, просто попробуем Fallback один раз здесь
                     try {
+                        Write-Warning "Primary URL failed. Trying fallback: $FallbackUrl"
                         if ($OutFile -ne '') {
-                            Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec
+                            Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec -UseBasicParsing
+                            return
                         } else {
-                            $result = Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec
-                            
-                            if (-not ($result.PSObject.Properties.Name -contains 'Links')) {
-                                $links = [regex]::Matches($result.Content, 'href="([^"]+)"') |
-                                    ForEach-Object { $_.Groups[1].Value }
-
-                                $linkObjects = @()
-                                foreach ($href in $links) {
-                                    $linkObjects += [PSCustomObject]@{ Href = $href }
-                                }
-
-                                Add-Member -InputObject $result -MemberType NoteProperty -Name Links -Value $linkObjects
+                            # Повторяем логику парсинга для Fallback
+                            $response = Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec -UseBasicParsing
+                            $content = $response.Content
+                            $links = @()
+                            $matches = [regex]::Matches($content, 'href=["\']([^"\']+)["\']', 'IgnoreCase')
+                            foreach ($m in $matches) {
+                                $links += [PSCustomObject]@{ Href = $m.Groups[1].Value }
                             }
-
-                            return $result
+                            return [PSCustomObject]@{
+                                Content = $content
+                                Links   = $links
+                            }
                         }
                     } catch {
-                        throw "Failed to download the file from $Url and $FallbackUrl - $($_.Exception.Message)"
+                        throw "Failed to download from $Url and $FallbackUrl - $($_.Exception.Message)"
                     }
                 } else {
-                    throw "Failed to download the file from $Url - $($_.Exception.Message)"
+                    throw "Failed to download from $Url - $($_.Exception.Message)"
                 }
             }
+            # Небольшая пауза перед повторной попыткой
+            Start-Sleep -Milliseconds 500
         }
     }
 }
