@@ -37,9 +37,12 @@ Function Get-File {
                 $content = $response.Content
 
                 # Эмуляция свойства .Links для совместимости с PowerShell Core/7+
-                # Ищем все <a href="..."> или просто href="..."
                 $links = @()
-                $pattern = 'href=["\']([^"\']+)["\']'
+                
+                # ИСПРАВЛЕНИЕ: В PowerShell одинарная кавычка внутри строки экранируется как ''
+                # Регулярка ищет href="..." или href='...'
+                $pattern = 'href=["'']([^"'']+)["'']'
+                
                 $matches = [regex]::Matches($content, $pattern, 'IgnoreCase')
                 
                 foreach ($m in $matches) {
@@ -49,7 +52,7 @@ Function Get-File {
                     }
                 }
 
-                # Возвращаем кастомный объект, который имеет структуру, ожидаемую вашим скриптом
+                # Возвращаем кастомный объект
                 return [PSCustomObject]@{
                     Content = $content
                     Links   = $links
@@ -60,19 +63,18 @@ Function Get-File {
             # Логика переключения на Fallback URL при последней попытке
             if ($i -eq ($Retries - 1)) {
                 if ($FallbackUrl -and $currentUrl -ne $FallbackUrl) {
-                    # Сбрасываем счетчик и меняем URL на запасной, пробуем еще раз (цикл Retries)
-                    # Но чтобы не усложнять рекурсией, просто попробуем Fallback один раз здесь
                     try {
                         Write-Warning "Primary URL failed. Trying fallback: $FallbackUrl"
                         if ($OutFile -ne '') {
                             Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec -UseBasicParsing
                             return
                         } else {
-                            # Повторяем логику парсинга для Fallback
                             $response = Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec -UseBasicParsing
                             $content = $response.Content
                             $links = @()
-                            $matches = [regex]::Matches($content, 'href=["\']([^"\']+)["\']', 'IgnoreCase')
+                            # То же самое исправление регулярного выражения для Fallback
+                            $pattern = 'href=["'']([^"'']+)["'']'
+                            $matches = [regex]::Matches($content, $pattern, 'IgnoreCase')
                             foreach ($m in $matches) {
                                 $links += [PSCustomObject]@{ Href = $m.Groups[1].Value }
                             }
@@ -88,7 +90,6 @@ Function Get-File {
                     throw "Failed to download from $Url - $($_.Exception.Message)"
                 }
             }
-            # Небольшая пауза перед повторной попыткой
             Start-Sleep -Milliseconds 500
         }
     }
