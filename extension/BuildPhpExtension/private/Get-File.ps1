@@ -1,11 +1,13 @@
 Function Get-File {
     <#
     .SYNOPSIS
-        Downloads a file or HTML page from a URL, with retries and HTML link extraction support for PS7+.
+        Downloads a file from a URL with retries and an optional fallback URL.
+        Compatible with both old and new PowerShell versions.
     #>
     [OutputType()]
     param (
         [Parameter(Mandatory = $true, Position=0)]
+        [ValidateNotNullOrEmpty()]
         [string] $Url,
 
         [Parameter(Position=1)]
@@ -23,65 +25,56 @@ Function Get-File {
 
     for ($i = 0; $i -lt $Retries; $i++) {
         try {
-            # Выполняем запрос
-            $resp = if ($OutFile -ne '') {
-                Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec $TimeoutSec
-            } else {
-                Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec
-            }
-
-            # Если это был файл — просто выходим
+            # Выполняем запрос (без -UseBasicParsing — в новых версиях не нужно)
             if ($OutFile -ne '') {
-                return $true
+                $result = Invoke-WebRequest -Uri $Url -OutFile $OutFile -TimeoutSec $TimeoutSec
+            } else {
+                $result = Invoke-WebRequest -Uri $Url -TimeoutSec $TimeoutSec
             }
 
-            # Если это HTML‑страница, добавим поле Links
-            if ($resp.Headers.'Content-Type' -match 'text/html' -or
-                $resp.Content -match '<html') {
+            # Только если мы ничего не сохраняем, возвращаем объект с контентом
+            if ($OutFile -eq '') {
+                # Если нет свойства .Links (новый PS), добавим его вручную
+                if (-not ($result.PSObject.Properties.Name -contains 'Links')) {
+                    # Пробуем распарсить href ссылки из HTML контента
+                    $links = [regex]::Matches($result.Content, 'href="([^"]+)"') |
+                        ForEach-Object { $_.Groups[1].Value }
 
-                # Парсим ссылки вручную
-                $matches = [regex]::Matches($resp.Content, 'href="([^"]+)"')
-                $hrefs = @()
-                foreach ($m in $matches) {
-                    $hrefs += [PSCustomObject]@{
-                        Href = $m.Groups[1].Value
+                    $linkObjects = @()
+                    foreach ($href in $links) {
+                        $linkObjects += [PSCustomObject]@{ Href = $href }
                     }
+
+                    # Добавляем свойство Links
+                    Add-Member -InputObject $result -MemberType NoteProperty -Name Links -Value $linkObjects
                 }
 
-                # Возвращаем объект, похожий на старый HtmlWebResponseObject
-                return [PSCustomObject]@{
-                    StatusCode = $resp.StatusCode
-                    Headers    = $resp.Headers
-                    Content    = $resp.Content
-                    Links      = $hrefs
-                }
+                return $result
             }
 
-            # Если не HTML — возвращаем просто сырые данные
-            return [PSCustomObject]@{
-                StatusCode = $resp.StatusCode
-                Headers    = $resp.Headers
-                Content    = $resp.Content
-                Links      = @()
-            }
-
+            break
         } catch {
-            Write-Warning "Attempt $($i + 1) failed: $($_.Exception.Message)"
-
             if ($i -eq ($Retries - 1)) {
                 if ($FallbackUrl) {
                     try {
                         if ($OutFile -ne '') {
                             Invoke-WebRequest -Uri $FallbackUrl -OutFile $OutFile -TimeoutSec $TimeoutSec
-                            return $true
                         } else {
-                            $respFallback = Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec
-                            return [PSCustomObject]@{
-                                StatusCode = $respFallback.StatusCode
-                                Headers    = $respFallback.Headers
-                                Content    = $respFallback.Content
-                                Links      = @()
+                            $result = Invoke-WebRequest -Uri $FallbackUrl -TimeoutSec $TimeoutSec
+                            
+                            if (-not ($result.PSObject.Properties.Name -contains 'Links')) {
+                                $links = [regex]::Matches($result.Content, 'href="([^"]+)"') |
+                                    ForEach-Object { $_.Groups[1].Value }
+
+                                $linkObjects = @()
+                                foreach ($href in $links) {
+                                    $linkObjects += [PSCustomObject]@{ Href = $href }
+                                }
+
+                                Add-Member -InputObject $result -MemberType NoteProperty -Name Links -Value $linkObjects
                             }
+
+                            return $result
                         }
                     } catch {
                         throw "Failed to download the file from $Url and $FallbackUrl - $($_.Exception.Message)"
