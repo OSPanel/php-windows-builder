@@ -114,7 +114,7 @@ Function Get-LibrariesFromConfig {
         if($Extension -eq 'parallel') {
             $foundItems += 'pthreads'
         }
-        if($Extension -eq "luasandbox") {
+        if($Extension -eq 'luasandbox' -or $Extension -eq 'lua') {
             $foundItems = @("lua-5.1")
         }
 
