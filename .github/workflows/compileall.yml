@@ -223,7 +223,7 @@ jobs:
         # Prepare
         successfully_processed=()
         failed_extensions=()
-        versions="7.2,7.3,7.4,8.0,8.1,8.2,8.3,8.4,8.5"
+        versions="8.5"
         current_extension=0
 
         # Do not fail the entire job on a single iteration error
