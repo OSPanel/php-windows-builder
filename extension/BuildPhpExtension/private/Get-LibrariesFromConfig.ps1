@@ -81,11 +81,12 @@ Function Get-LibrariesFromConfig {
 
         $foundItems = @()
         $libraryFilesFound = @()
-        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|(\w+\slib)|(SETUP_\w+)') | ForEach-Object {
+        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|(\b(?i:(?!curl\b|idn\b))\w+\s+lib\b)|(SETUP_\w+)') | ForEach-Object {
             $_.Groups[1].Value.Split(';') + ($_.Groups[2].Value -Split '[^\w\.]') + ($_.Groups[3].Value -Split '[^\w\.]') + ($_.Groups[4].Value) + ($_.Groups[5].Value) | ForEach-Object {
                 $libraryFilesFound += $_
             }
         }
+
         $libraryFilesFound | Select-Object -Unique | ForEach-Object {
             if($_) {
                 switch -Wildcard ($_) {
