@@ -172,34 +172,14 @@ Function Get-ExtensionConfig {
                 $env:AUTO_DETECT_LIBS = 'true'
             }
 
-            if ($env:AUTO_DETECT_ARGS -eq 'true') {
-                if ($null -eq $config.options) {
-                    $config.options = @()
-                } elseif ($config.options -isnot [System.Array]) {
-                    $config.options = @($config.options)
-                }
-
-                $seenKeys = @{}
-                foreach ($opt in $config.options) {
-                    if ([string]::IsNullOrWhiteSpace($opt)) { continue }
-                    $key = ($opt -split '=', 2)[0].Trim()
-                    if (-not [string]::IsNullOrWhiteSpace($key)) {
-                        $seenKeys[$key] = $true
-                    }
-                }
-
+            if($env:AUTO_DETECT_ARGS -eq 'true') {
                 $arguments = Get-ArgumentsFromConfig $Extension $configW32Content
                 foreach ($argument in $arguments) {
-                    if ([string]::IsNullOrWhiteSpace($argument)) { continue }
-
-                    $argument = $argument.Trim()
-                    $argumentKey = ($argument -split '=', 2)[0].Trim()
-
-                    if (-not $seenKeys.ContainsKey($argumentKey)) {
-                        $seenKeys[$argumentKey] = $true
-                        $config.options += $argument
+                    $argumentKey = $argument.Split("=")[0]
+                    if ($null -ne $argument -and -not ($config.options.contains($argumentKey))) {
+                        $config.options += " $argument"
                     }
-                }
+                }     
             }
 
             if ([System.Environment]::GetEnvironmentVariable("no-debug-symbols-$Extension") -eq 'true') {
