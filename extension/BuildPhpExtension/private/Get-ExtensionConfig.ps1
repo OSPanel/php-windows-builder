@@ -173,11 +173,13 @@ Function Get-ExtensionConfig {
             }
 
             if($env:AUTO_DETECT_ARGS -eq 'true') {
-                $argument = Get-ArgumentFromConfig $Extension $configW32Content
-                $argumentKey = $argument.Split("=")[0]
-                if($null -ne $argument -and -not($config.options.contains($argumentKey))) {
-                    $config.options += " $argument"
-                }
+                $arguments = Get-ArgumentsFromConfig $Extension $configW32Content
+                foreach ($argument in $arguments) {
+                    $argumentKey = $argument.Split("=")[0]
+                    if ($null -ne $argument -and -not ($config.options.contains($argumentKey))) {
+                        $config.options += " $argument"
+                    }
+                }     
             }
 
             if ([System.Environment]::GetEnvironmentVariable("no-debug-symbols-$Extension") -eq 'true') {
