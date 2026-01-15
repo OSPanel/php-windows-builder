@@ -81,17 +81,12 @@ Function Get-LibrariesFromConfig {
 
         $foundItems = @()
         $libraryFilesFound = @()
-        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|(\w+\slib)|(SETUP_\w+)') | ForEach-Object {
+        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|((?!(?i:(?:curl|idn))\s+lib\b)\w+\slib)|(SETUP_\w+)') | ForEach-Object {
             $_.Groups[1].Value.Split(';') + ($_.Groups[2].Value -Split '[^\w\.]') + ($_.Groups[3].Value -Split '[^\w\.]') + ($_.Groups[4].Value) + ($_.Groups[5].Value) | ForEach-Object {
                 $libraryFilesFound += $_
             }
-               if($_.Groups[4].Success) {Write-Host "HIT G4: '$($_.Groups[4].Value)'  at index=$($_.Index)" }
         }
 
-
-  $libraryFilesFound | Select-Object -Unique | ForEach-Object {
-  if($_ -match 'curl') { Write-Host "RAW ITEM: '$_'" }
-}
         $libraryFilesFound | Select-Object -Unique | ForEach-Object {
             if($_) {
                 switch -Wildcard ($_) {
