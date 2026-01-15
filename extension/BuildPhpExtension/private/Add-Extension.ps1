@@ -36,7 +36,7 @@ Function Add-Extension {
         $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -PhpVersion $Config.php_version -BuildDirectory $currentDirectory -LocalSrc $source.local
 
         $configW32Content = [string](Get-Content -Path "config.w32")
-        $argument = Get-ArgumentFromConfig $Extension $configW32Content
+        $argument = Get-ArgumentsFromConfig $Config.php_version $Extension $configW32Content
 
         $cfgoptions = @()
         $seenKeys = @{}
