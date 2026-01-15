@@ -120,10 +120,15 @@ function Get-Extension {
 
                         git checkout FETCH_HEAD > $null 2>&1
 
-                        $targetExtensions = @("ddtrace", "lz4", "phpredis", "redis", "brotli")
-                        if ($targetExtensions | Where-Object { $Extension.Contains($_) }) {
-                            git submodule update --init --recursive > $null 2>&1
+                        if (Test-Path -LiteralPath (Join-Path (Get-Location).Path '.gitmodules')) {
+                            git submodule sync --recursive > $null 2>&1
+                            git submodule update --init --recursive --depth 1 > $null 2>&1
                         }
+
+                        # $targetExtensions = @("ddtrace", "lz4", "phpredis", "redis", "brotli")
+                        # if ($targetExtensions | Where-Object { $Extension.Contains($_) }) {
+                        #     git submodule update --init --recursive > $null 2>&1
+                        # }
                     }
                 }
 
