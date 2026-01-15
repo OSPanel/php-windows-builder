@@ -37,14 +37,27 @@ Function Add-Extension {
 
         $configW32Content = [string](Get-Content -Path "config.w32")
         $argument = Get-ArgumentFromConfig $Extension $configW32Content
+
+        $cfgoptions = @()
+        $seenKeys = @{}
+        foreach ($argument in $arguments) {
+          if ([string]::IsNullOrWhiteSpace($argument)) { continue }
+          $argumentKey = ($argument -split '=', 2)[0]
+          if (-not $seenKeys.ContainsKey($argumentKey)) {
+             $seenKeys[$argumentKey] = $true
+             $cfgoptions += $argument
+          }
+        }
+
+        $cfgoptionsStr = ($cfgoptions -join ' ')
         $bat_content = @()
         $bat_content += ""
         $bat_content += "call phpize 2>&1"
-        Write-Host "ARGUMENT: $argument"
+        Write-Host "ARGUMENTS: $cfgoptionsStr"
             if($Config.php_version -eq '7.2') {
-        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--with-prefix=$Prefix`" 2>&1"
+        $bat_content += "call configure `"--with-php-build=..\deps`" $cfgoptionsStr `"--with-mp=disable`" `"--with-prefix=$Prefix`" 2>&1"
             } else {
-        $bat_content += "call configure `"--with-php-build=..\deps`" $argument `"--with-mp=disable`" `"--enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2`" `"--with-prefix=$Prefix`" 2>&1"
+        $bat_content += "call configure `"--with-php-build=..\deps`" $cfgoptionsStr `"--with-mp=disable`" `"--enable-native-intrinsics=sse2,ssse3,sse4.1,sse4.2`" `"--with-prefix=$Prefix`" 2>&1"
             }
 
         $bat_content += "nmake /nologo 2>&1"

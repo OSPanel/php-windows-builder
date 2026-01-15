@@ -120,6 +120,8 @@ jobs:
           php-version: ${{ matrix.php-version }}
           arch: ${{ matrix.arch }}
           ts: ${{ matrix.ts }}
+        env:
+          PHP_BUILD_PROVIDER: "The PHP Group"
 
   process-artifacts:
     if: ${{ inputs.do-release == 'true' }} # NEW

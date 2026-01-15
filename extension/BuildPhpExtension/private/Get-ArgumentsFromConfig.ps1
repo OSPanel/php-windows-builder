@@ -31,6 +31,12 @@ Function Get-ArgumentFromConfig {
             $dashedExtension = $Extension
         }
 
+        $arguments = @()
+
+        if($configW32Content.contains('ARG_WITH("boost"')) {
+            $arguments += "--with-boost=..\deps\boost"
+        }
+
         $argValue='';
         if($ConfigW32Content.Contains("PHP_$($Extension.ToUpper())_SHARED")) {
             $argValue = "shared"
@@ -43,7 +49,8 @@ Function Get-ArgumentFromConfig {
         if($argValue -ne '') {
             $arg="$arg=$argValue"
         }
-        return $arg
+        $arguments += $arg
+        return $arguments
     }
     end {
     }

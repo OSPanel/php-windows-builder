@@ -1,7 +1,7 @@
 Function Add-ExtensionDependencies {
     <#
     .SYNOPSIS
-        Add a directory to PATH environment variable.
+        Add extension dependencies.
     .PARAMETER Config
         Configuration for the extension.
     #>
@@ -34,7 +34,7 @@ Function Add-ExtensionDependencies {
                         $url = "https://files.ospanel.io/~windows/pecl/deps/$_"
                         Get-File -Url $url -OutFile $_
                         Expand-Archive -Path $_ -DestinationPath "..\deps" -Force
-                        if(Test-Path "..\deps\LICENSE") {
+                        if((Test-Path "..\deps\LICENSE") -and (-not(Test-Path "..\deps\LICENSE.$library"))) {
                             Rename-Item -Path "..\deps\LICENSE" -NewName "LICENSE.$library"
                         }
                         if(Test-Path "..\deps\lib\ossl-modules") {

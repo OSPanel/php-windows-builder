@@ -92,6 +92,8 @@ function Invoke-PhpTests {
             $settings.runner,
             $settings.progress,
             "-g", "FAIL,BORK,WARN,LEAK",
+            "-d", "open_basedir=",
+            "-d", "output_buffering=0",
             "-q",
             "--offline",
             "--show-diff",

@@ -24,9 +24,25 @@ Function Invoke-Tests {
             $env:PHP_AMQP_HOST="rabbitmq"
             $env:PHP_AMQP_SSL_HOST="rabbitmq.example.org"
             if($Config.name -eq 'pdo_oci') {
+                $env:TEST_WORKERS = 1
                 Get-PhpSrc -PhpVersion $Config.php_version
+
+                # This test is not compatible with Oracle XE
+                $testPath = "$currentDirectory\php-$($Config.php_version)-src\ext\pdo\tests\gh20553.phpt"
+                if (Test-Path $testPath) {
+                    Remove-Item $testPath -Force
+                }
+
                 $env:PDO_TEST_DIR = "$currentDirectory\php-$($Config.php_version)-src\ext\pdo\tests"
                 $env:PDO_OCI_TEST_DIR = "$currentDirectory\tests"
+                $env:PDO_OCI_TEST_USER = "system"
+                $env:PDO_OCI_TEST_PASS = "oracle"
+                $env:PDO_OCI_TEST_DSN = "oci:dbname=localhost:1521/XEPDB1.localdomain;charset=AL32UTF8"
+            }
+            if($Config.name -eq 'oci8_19'){
+                $env:PHP_OCI8_TEST_USER = "system"
+                $env:PHP_OCI8_TEST_PASS = "oracle"
+                $env:PHP_OCI8_TEST_DB = "localhost:1521/XEPDB1.localdomain"
             }
             $tempOriginal = $env:TEMP
             Get-TempFiles
@@ -50,6 +66,8 @@ Function Invoke-Tests {
                 $test_runner_args = $env:TEST_RUNNER_ARGS -split '\s+'
             } else {
                 $test_runner_args = @(
+                    '-d open_basedir=',
+                    '-d output_buffering=0',
                     '-q',
                     '--offline',
                     '--show-diff',

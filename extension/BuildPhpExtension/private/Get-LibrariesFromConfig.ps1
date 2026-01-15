@@ -2,6 +2,8 @@ Function Get-LibrariesFromConfig {
     <#
     .SYNOPSIS
         Get the Libraries from the config.w32 file
+    .PARAMETER PhpVersion
+        PhpVersion
     .PARAMETER Extension
         Extension
     .PARAMETER VsVersion
@@ -13,22 +15,23 @@ Function Get-LibrariesFromConfig {
     #>
     [OutputType()]
     param (
-        [Parameter(Mandatory = $true, Position=0, HelpMessage='Extension')]
+        [Parameter(Mandatory = $true, Position=0, HelpMessage='PHP Version')]
+        [string] $PhpVersion,
+        [Parameter(Mandatory = $true, Position=1, HelpMessage='Extension')]
         [string] $Extension,
-        [Parameter(Mandatory = $true, Position=1, HelpMessage='Visual Studio Version')]
+        [Parameter(Mandatory = $true, Position=2, HelpMessage='Visual Studio Version')]
         [string] $VsVersion,
-        [Parameter(Mandatory = $true, Position=2, HelpMessage='Architecture')]
+        [Parameter(Mandatory = $true, Position=3, HelpMessage='Architecture')]
         [string] $Arch,
-        [Parameter(Mandatory = $true, Position=3, HelpMessage='config.w32 content')]
+        [Parameter(Mandatory = $true, Position=4, HelpMessage='config.w32 content')]
         [string] $ConfigW32Content
     )
     begin {
         $jsonPath = [System.IO.Path]::Combine($PSScriptRoot, '..\config\vs.json')
     }
     process {
-        $jsonData = (
-        Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/libmapping.json"
-        ).Content | ConvertFrom-Json
+        $jsonDataContent = (Get-File -Url "https://files.ospanel.io/~windows/pecl/deps/libmapping.json").Content
+        $jsonData = $jsonDataContent | ConvertFrom-Json
 
         $phpSeries = (Get-File -Url "https://files.ospanel.io/~windows/php-sdk/deps/$VsVersion/$Arch").Content.ToLower()
 
@@ -61,6 +64,17 @@ Function Get-LibrariesFromConfig {
             return $null
         }
 
+        Function Test-Library {
+            param (
+                [Parameter(Mandatory=$true, Position=0)]
+                [string]$library
+            )
+            if($jsonDataContent.Contains("`"$library-") -or $phpSeries.Contains("`"$library-") -or $jsonDataContent.Contains("`"lib$library-") -or $phpSeries.Contains("`"lib$library-")) {
+                return $library
+            }
+            return $null
+        }
+
         $jsonContent = Get-Content -Path $jsonPath -Raw
         $VsConfig = ConvertFrom-Json -InputObject $jsonContent
         $VsVersions = @($VsVersion)
@@ -71,19 +85,20 @@ Function Get-LibrariesFromConfig {
 
         $foundItems = @()
         $libraryFilesFound = @()
-        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|(SETUP_\w+)') | ForEach-Object {
-            $_.Groups[1].Value.Split(';') + ($_.Groups[2].Value -Split '[^\w\.]') + ($_.Groups[3].Value -Split '[^\w\.]') + ($_.Groups[4].Value) | ForEach-Object {
+        [regex]::Matches($ConfigW32Content, 'CHECK_LIB\(["'']([^"'']+)["'']|["'']([^"'']+\.lib)["'']|(\w+\.lib)|(\w+\slib)|(SETUP_\w+)') | ForEach-Object {
+            $_.Groups[1].Value.Split(';') + ($_.Groups[2].Value -Split '[^\w\.]') + ($_.Groups[3].Value -Split '[^\w\.]') + ($_.Groups[4].Value) + ($_.Groups[5].Value) | ForEach-Object {
                 $libraryFilesFound += $_
             }
         }
         $libraryFilesFound | Select-Object -Unique | ForEach-Object {
             if($_) {
-                switch ($_) {
+                switch -Wildcard ($_) {
                     SETUP_ZLIB_LIB { $library = "zlib" }
                     SETUP_OPENSSL { $library = "openssl" }
                     SETUP_SQLITE3 { $library = "sqlite" }
                     libeay32.lib { $library = "openssl" }
                     ssleay32.lib { $library = "openssl" }
+                    "* lib" { $library = Test-Library $_.Replace(" lib","") }
                     Default { $library = Find-Library $_ $VsVersions }
                 }
                 if($library -and (-not($foundItems.Contains($library)))) {
@@ -97,10 +112,23 @@ Function Get-LibrariesFromConfig {
         if($Extension -eq "mongodb") {
             $foundItems = $foundItems | Where-Object {$_ -notmatch "libsasl.*"}
         }
+        
+        # For PHP Version 8.0, replace librabbitmq.openssl3 with librabbitmq.openssl1.1
+        if($PhpVersion -match '^8\.0') {
+            $foundItems = $foundItems | ForEach-Object {
+                if($_ -match 'librabbitmq\.openssl3') { $_ -replace 'librabbitmq\.openssl3', 'librabbitmq.openssl1.1' } else { $_ }
+            }
+        }
+        
         # Custom mappings which are not in config.w32
         if($Extension -eq "memcached" -or $Extension -eq "xlswriter") {
             $foundItems += "zlib"
         }
+
+        if($ConfigW32Content.Contains("boost")) {
+            $foundItems += "boost"
+        }
+        
         if($Extension -eq "oci8_19" -or $Extension -eq "pdo_oci") {
             $foundItems += "instantclient"
         }

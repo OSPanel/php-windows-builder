@@ -172,11 +172,33 @@ Function Get-ExtensionConfig {
                 $env:AUTO_DETECT_LIBS = 'true'
             }
 
-            if($env:AUTO_DETECT_ARGS -eq 'true') {
-                $argument = Get-ArgumentFromConfig $Extension $configW32Content
-                $argumentKey = $argument.Split("=")[0]
-                if($null -ne $argument -and -not($config.options.contains($argumentKey))) {
-                    $config.options += " $argument"
+            if ($env:AUTO_DETECT_ARGS -eq 'true') {
+                if ($null -eq $config.options) {
+                    $config.options = @()
+                } elseif ($config.options -isnot [System.Array]) {
+                    $config.options = @($config.options)
+                }
+
+                $seenKeys = @{}
+                foreach ($opt in $config.options) {
+                    if ([string]::IsNullOrWhiteSpace($opt)) { continue }
+                    $key = ($opt -split '=', 2)[0].Trim()
+                    if (-not [string]::IsNullOrWhiteSpace($key)) {
+                        $seenKeys[$key] = $true
+                    }
+                }
+
+                $arguments = Get-ArgumentsFromConfig $Extension $configW32Content
+                foreach ($argument in $arguments) {
+                    if ([string]::IsNullOrWhiteSpace($argument)) { continue }
+
+                    $argument = $argument.Trim()
+                    $argumentKey = ($argument -split '=', 2)[0].Trim()
+
+                    if (-not $seenKeys.ContainsKey($argumentKey)) {
+                        $seenKeys[$argumentKey] = $true
+                        $config.options += $argument
+                    }
                 }
             }
 
@@ -185,7 +207,7 @@ Function Get-ExtensionConfig {
             }
 
             if($env:AUTO_DETECT_LIBS -eq 'true') {
-                $detectedLibraries = Get-LibrariesFromConfig $Extension $VsVersion $Arch $configW32Content
+                $detectedLibraries = Get-LibrariesFromConfig $PhpVersion $Extension $VsVersion $Arch $configW32Content
                 if($null -ne $detectedLibraries) {
                     $LibrariesList = $Libraries
                     $Libraries = $detectedLibraries.Split(" ")
@@ -210,7 +232,7 @@ Function Get-ExtensionConfig {
             $thirdPartyLibraries = @("boost", "instantclient", "odbc_cli")
             $Libraries | Select-Object -Unique | ForEach-Object {
                 Write-Host "Process PECL library: $_"
-                if($thirdPartyLibraries.Contains($_)) {
+                if($thirdPartyLibraries.Contains($_) -and $config.extension_libraries -notcontains $_) {
                     $config.extension_libraries += $_
                 } elseif($null -ne $_ -and -not([string]::IsNullOrWhiteSpace($_))) {
                     if ($phpSeries.Content.ToLower().Contains($_) -and -not($config.php_libraries.Contains($_))) {
@@ -218,11 +240,15 @@ Function Get-ExtensionConfig {
                     } elseif (($extensionSeries.Content + $extensionArchivesSeries.Content).ToLower().Contains($_.ToLower()) -and -not($config.extension_libraries.Contains($_))) {
                         $lib = Get-PeclLibraryZip -Library $_ -PhpVersion $PhpVersion -VsVersion $VsVersion -Arch $Arch -ExtensionSeries $extensionSeries
                         if($null -ne $lib) {
-                            $config.extension_libraries += $lib
+                            if($config.extension_libraries -notcontains $lib) {
+                                $config.extension_libraries += $lib
+                            }
                         } else {
                             $lib = Get-PeclLibraryZip -Library $_ -PhpVersion $PhpVersion -VsVersion $VsVersion -Arch $Arch -ExtensionSeries $extensionArchivesSeries
                             if($null -ne $lib) {
-                                $config.extension_libraries += $lib
+                                if($config.extension_libraries -notcontains $lib) {
+                                    $config.extension_libraries += $lib
+                                }
                             } else {
                                 throw "Library $_ not found for the PHP version $PhpVersion and Visual Studio version $VsVersion"
                             }
@@ -231,6 +257,10 @@ Function Get-ExtensionConfig {
                         throw "Library $_ not found for the PHP version $PhpVersion and Visual Studio version $VsVersion"
                     }
                 }
+            }
+
+            if($config.extension_libraries -contains 'instantclient' -and $env:RUN_TESTS -eq 'true') {
+                $config.build_tools += "oci_db"
             }
 
             # TODO: This should be implemented using composer.json once implemented
