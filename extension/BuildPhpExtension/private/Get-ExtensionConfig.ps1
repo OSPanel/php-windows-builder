@@ -188,7 +188,7 @@ Function Get-ExtensionConfig {
                     }
                 }
 
-                $arguments = Get-ArgumentsFromConfig $PhpVersion $Extension $configW32Content
+                $arguments = Get-ArgumentsFromConfig $Extension $configW32Content
                 foreach ($argument in $arguments) {
                     if ([string]::IsNullOrWhiteSpace($argument)) { continue }
 
