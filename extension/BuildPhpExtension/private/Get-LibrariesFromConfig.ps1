@@ -2,8 +2,6 @@ Function Get-LibrariesFromConfig {
     <#
     .SYNOPSIS
         Get the Libraries from the config.w32 file
-    .PARAMETER PhpVersion
-        PhpVersion
     .PARAMETER Extension
         Extension
     .PARAMETER VsVersion
@@ -15,15 +13,13 @@ Function Get-LibrariesFromConfig {
     #>
     [OutputType()]
     param (
-        [Parameter(Mandatory = $true, Position=0, HelpMessage='PHP Version')]
-        [string] $PhpVersion,
-        [Parameter(Mandatory = $true, Position=1, HelpMessage='Extension')]
+        [Parameter(Mandatory = $true, Position=0, HelpMessage='Extension')]
         [string] $Extension,
-        [Parameter(Mandatory = $true, Position=2, HelpMessage='Visual Studio Version')]
+        [Parameter(Mandatory = $true, Position=1, HelpMessage='Visual Studio Version')]
         [string] $VsVersion,
-        [Parameter(Mandatory = $true, Position=3, HelpMessage='Architecture')]
+        [Parameter(Mandatory = $true, Position=2, HelpMessage='Architecture')]
         [string] $Arch,
-        [Parameter(Mandatory = $true, Position=4, HelpMessage='config.w32 content')]
+        [Parameter(Mandatory = $true, Position=3, HelpMessage='config.w32 content')]
         [string] $ConfigW32Content
     )
     begin {
@@ -112,14 +108,7 @@ Function Get-LibrariesFromConfig {
         if($Extension -eq "mongodb") {
             $foundItems = $foundItems | Where-Object {$_ -notmatch "libsasl.*"}
         }
-        
-        # For PHP Version 8.0, replace librabbitmq.openssl3 with librabbitmq.openssl1.1
-        if($PhpVersion -match '^8\.0') {
-            $foundItems = $foundItems | ForEach-Object {
-                if($_ -match 'librabbitmq\.openssl3') { $_ -replace 'librabbitmq\.openssl3', 'librabbitmq.openssl1.1' } else { $_ }
-            }
-        }
-        
+              
         # Custom mappings which are not in config.w32
         if($Extension -eq "memcached" -or $Extension -eq "xlswriter") {
             $foundItems += "zlib"
