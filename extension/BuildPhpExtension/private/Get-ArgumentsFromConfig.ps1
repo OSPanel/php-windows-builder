@@ -1,4 +1,4 @@
-Function Get-ArgumentFromConfig {
+Function Get-ArgumentsFromConfig {
     <#
     .SYNOPSIS
         Get the Libraries from the config.w32 file
