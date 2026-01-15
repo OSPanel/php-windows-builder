@@ -255,6 +255,10 @@ Function Get-ExtensionConfig {
                 }
             }
 
+            if($config.extension_libraries -contains 'instantclient' -and $env:RUN_TESTS -eq 'true') {
+                $config.build_tools += "oci_db"
+            }
+
             # TODO: This should be implemented using composer.json once implemented
             $packageXml = Get-ChildItem (Get-Location).Path -Filter "package.xml" -ErrorAction SilentlyContinue | Select-Object -First 1
             if($null -ne $packageXml) {
