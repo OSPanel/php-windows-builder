@@ -36,20 +36,24 @@ Function Add-Extension {
         $Extension = Get-Extension -ExtensionUrl $source.url -ExtensionRef $source.ref -PhpVersion $Config.php_version -BuildDirectory $currentDirectory -LocalSrc $source.local
 
         $configW32Content = [string](Get-Content -Path "config.w32")
-        $argument = Get-ArgumentsFromConfig $Extension $configW32Content
+        $arguments = Get-ArgumentsFromConfig $Extension $configW32Content
 
-        $cfgoptions = @()
-        $seenKeys = @{}
+
+        $configstmp = @{}
+        $configstmp.options = @()
+
         foreach ($argument in $arguments) {
-          if ([string]::IsNullOrWhiteSpace($argument)) { continue }
-          $argumentKey = ($argument -split '=', 2)[0]
-          if (-not $seenKeys.ContainsKey($argumentKey)) {
-             $seenKeys[$argumentKey] = $true
-             $cfgoptions += $argument
-          }
+        if ([string]::IsNullOrWhiteSpace($argument)) { continue }
+        $argumentKey = ($argument -split '=', 2)[0]
+
+        if ($null -ne $argument -and -not ($configstmp.options.Contains($argumentKey))) {
+            $configstmp.options += $argument
+        }
         }
 
-        $cfgoptionsStr = ($cfgoptions -join ' ')
+
+        $cfgoptionsStr  = ($configstmp.options -join ' ')
+
         $bat_content = @()
         $bat_content += ""
         $bat_content += "call phpize 2>&1"
