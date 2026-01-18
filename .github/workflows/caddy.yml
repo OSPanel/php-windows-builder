@@ -1,0 +1,46 @@
+name: Build Custom Caddy (Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      caddy_version:
+        description: "Версия Caddy (например, v2.8.4)"
+        required: true
+        default: "v2.10.2"
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      # 1. Checkout репозиторий
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Установка Go
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.6"
+
+      # 3. Установка xcaddy
+      - name: Install xcaddy
+        shell: pwsh
+        run: |
+          go install github.com/caddyserver/xcaddy/cmd/xcaddy@latest
+          echo "$env:USERPROFILE\go\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+
+      # 4. Сборка Caddy с модулями и указанной версией
+      - name: Build Caddy with modules
+        shell: pwsh
+        run: |
+          xcaddy build ${{ github.event.inputs.caddy_version }} `
+            --with github.com/gerolf-vent/caddy-vault-storage `
+            --with github.com/mohammed90/caddy-pocketbase
+
+      # 5. Сохранение артефакта
+      - name: Upload Caddy binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: caddy-custom-windows
+          path: ./caddy.exe
