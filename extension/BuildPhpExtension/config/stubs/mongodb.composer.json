@@ -14,6 +14,18 @@
             "name": "enable-mongodb"
         },
         {
+            "name": "with-mongodb-zlib=yes"
+        },
+        {
+            "name": "with-mongodb-zstd=yes"
+        },
+        {
+            "name": "with-mongodb-ssl=openssl"
+        },
+        {
+            "name": "enable-mongodb-crypto-system-profile=yes"
+        },
+        {
             "name": "with-mongodb-sasl=yes"
         },
         {
