@@ -4,8 +4,7 @@
         "ext-apcu": "*",
         "openssl": "*",
         "zlib": "*",
-        "ext-zstd": "*",
-        "libsasl": "*"
+        "ext-zstd": "*"
     },
     "php-ext":
     {
@@ -24,9 +23,6 @@
         },
         {
             "name": "enable-mongodb-crypto-system-profile=yes"
-        },
-        {
-            "name": "with-mongodb-sasl=yes"
         },
         {
             "name": "with-mongodb-client-side-encryption=yes"
