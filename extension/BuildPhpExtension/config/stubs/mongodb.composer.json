@@ -4,7 +4,8 @@
         "ext-apcu": "*",
         "openssl": "*",
         "zlib": "*",
-        "ext-zstd": "*"
+        "ext-zstd": "*",
+        "libsasl": "*"
     },
     "php-ext":
     {
@@ -17,6 +18,9 @@
         },
         {
             "name": "with-mongodb-zstd=yes"
+        },
+        {
+            name": "with-mongodb-sasl=yes
         },
         {
             "name": "with-mongodb-ssl=openssl"
