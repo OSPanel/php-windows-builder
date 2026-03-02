@@ -20,9 +20,6 @@
             "name": "with-mongodb-zstd=yes"
         },
         {
-            "name": "with-mongodb-sasl=yes"
-        },
-        {
             "name": "with-mongodb-ssl=openssl"
         },
         {
