@@ -4,8 +4,7 @@
         "ext-apcu": "*",
         "openssl": "*",
         "zlib": "*",
-        "ext-zstd": "*",
-        "libsasl": "*"
+        "ext-zstd": "*"
     },
     "php-ext":
     {
